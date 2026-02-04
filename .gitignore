@@ -1,0 +1,15 @@
+/dist
+/out-tsc
+node_modules/
+functions/
+.idea/
+/.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+.env
+.DS_Store
+Thumbs.db
+/.firebase/

@@ -1,0 +1,38 @@
+{
+  "name": "bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
+    "@mui/x-date-pickers": "^8.0.0",
+    "@nivo/line": "^0.89.1",
+    "@tanstack/react-query": "^5.74.4",
+    "@types/d3-array": "^3.2.1",
+    "dayjs": "^1.11.13",
+    "dayjs-plugin-utc": "^0.1.2",
+    "firebase": "^11.6.0",
+    "lodash": "^4.17.21",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-error-boundary": "^5.0.0",
+    "react-router-dom": "^6.30.0"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.16",
+    "@types/react": "^19.1.1",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.5.3",
+    "vite": "^6.2.6"
+  },
+  "private": true
+}
