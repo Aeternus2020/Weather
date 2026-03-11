@@ -10,6 +10,9 @@ yarn-error.log*
 .pnp
 .pnp.js
 .env
+.env.local
+.env.*.local
 .DS_Store
 Thumbs.db
 /.firebase/
+AGENTS.md

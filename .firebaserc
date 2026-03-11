@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "money-revenue"
-  }
+    "default": "forecast-atlas"
+  },
+  "targets": {},
+  "etags": {}
 }
