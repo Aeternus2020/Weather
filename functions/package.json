@@ -7,7 +7,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test",
-    "smoke:providers": "zsh ./scripts/smoke-providers.sh"
+    "smoke:providers": "bash ./scripts/smoke-providers.sh"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",

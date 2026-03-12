@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -u
 
@@ -16,7 +16,7 @@ require_command() {
 
 is_missing_secret() {
   local value="${1:-}"
-  local normalized="${value:u}"
+  local normalized="${value^^}"
   [[ -z "$value" || "$normalized" == "REPLACE_ME" ]]
 }
 
