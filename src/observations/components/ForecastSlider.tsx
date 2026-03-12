@@ -12,7 +12,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check'
 import dayjs from 'dayjs'
 import { WeatherForecast } from '../typesWeatherObservations'
-import { scrollbarSx } from '../../market/TradeBotTable'
+import { scrollbarSx } from '../../ui/tabNavigation'
 import {makeForecastKey} from "../WeatherObservationsGraph";
 
 interface ForecastDriverProps {

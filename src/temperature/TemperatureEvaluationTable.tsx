@@ -21,7 +21,7 @@ import { useTemperatureEvaluationQuery } from "./useTemperatureEvaluationQuery"
 import type {BasedOnItem} from "./typesTemperatureEvaluation"
 import {convertBoundsToC} from "../observations/components/FahrenheitLinesLayer"
 import {isEqual } from "lodash"
-import {scrollbarSx, useLocalStorageActive} from "../market/TradeBotTable"
+import { TAB_HEIGHT, scrollbarSx, useLocalStorageActive } from "../ui/tabNavigation"
 
 interface Props {
     date: string
@@ -34,8 +34,6 @@ export const formatTime = (id: string) => {
     const d = new Date(iso)
     return isNaN(d.getTime()) ? "–" : d.toLocaleTimeString()
 }
-
-export const TAB_HEIGHT = 48
 
 const TE_KEY = 'temperatureEvaluation:lastActiveMap'
 
