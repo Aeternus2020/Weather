@@ -10,12 +10,10 @@ import {
     type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 
-export function useTradeBotQuery(userId: string | null, date: string) {
+export function useTradeBotQuery(date: string) {
     return useQuery<TradeBotLog[], Error>({
-        queryKey: ['tradeBot', userId, date],
+        queryKey: ['tradeBot', date],
         queryFn: async () => {
-            if (!userId) return [];
-
             const [year, month, day] = date.split('-').map(Number);
             const startUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
             const endUtc   = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0));
@@ -33,7 +31,6 @@ export function useTradeBotQuery(userId: string | null, date: string) {
                 ...(doc.data() as Omit<TradeBotLog, 'id'>),
             }));
         },
-        enabled: Boolean(userId),
         staleTime: Infinity,
         gcTime:    Infinity,
         refetchOnWindowFocus: true,

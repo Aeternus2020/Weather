@@ -25,10 +25,8 @@ import { TAB_HEIGHT} from "../temperature/TemperatureEvaluationTable"
 import type {OrderType, TradeBotLog} from "./typesTradeBot"
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import type {User} from "firebase/auth"
 
 interface Props {
-    user: User
     date: string,
     location: string
 }
@@ -103,11 +101,11 @@ export function useLocalStorageActive(
     return [active, setActive]
 }
 
-const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
+const TradeBotTable: React.FC<Props> = ({ date, location}) => {
     const [active, setActive] = useLocalStorageActive(TB_KEY, date, location)
     const [prevActive, setPrevActive] = useState(active)
 
-    const { data: entries = [], isLoading } = useTradeBotQuery(user.uid, date)
+    const { data: entries = [], isLoading } = useTradeBotQuery(date)
 
     function getLocation(e: TradeBotLog): string {
         return e.marketState?.configId?.trim() || 'London'
@@ -167,7 +165,7 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
     if (isLoading) return <CircularProgress/>
     if (!reversedEntries.length) {
         return (
-            <Typography sx={{m: 2, textAlign: 'center'}}>
+            <Typography sx={tradeBotEmptyStateSx}>
                 <strong>Trade Bot: </strong>No data for
                 <strong> {location}</strong> on
                 <strong> {date}</strong>.
@@ -201,29 +199,19 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
     }
 
     return (
-        <Box sx={{ display: 'flex', mb: 2, alignItems: 'stretch'}}>
-            <Box sx={{ display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                p: 1 }}>
-                <IconButton onClick={goPrev} disabled={active === 0} size='small' sx={{mr: 1}}>
+        <Box sx={tradeBotRootSx}>
+            <Box sx={tradeBotTabsColumnSx}>
+                <IconButton onClick={goPrev} disabled={active === 0} size='small' sx={tradeBotPrevButtonSx}>
                     <KeyboardArrowUpIcon />
                 </IconButton>
                 <Box ref={tabsContainerRef}
-                     sx={{ maxHeight: '570px',
-                         minWidth: 110,
-                         ...scrollbarSx,
-                     }}
+                     sx={tradeBotTabsScrollerSx}
                 >
                     <Tabs orientation='vertical'
                           variant="standard"
                           value={active}
                           onChange={(_, i) => { setPrevActive(active); setActive(i) }}
-                          sx={{
-                              '& .MuiTabs-indicator': {left: 0, width: 3, background: 'primary.main'},
-                              '& .MuiTab-root': {px: 1.5, textTransform: 'none', fontSize: 13},
-                              '& .MuiTab-root.Mui-selected': {fontWeight: 600, color: 'primary.main'},
-                          }}
+                          sx={tradeBotTabsSx}
                     >
                         {reversedEntries.map(e => {
                             const iso = e.id.split('_').pop()!
@@ -236,48 +224,26 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                     <KeyboardArrowDownIcon />
                 </IconButton>
             </Box>
-            <Box sx={{
-                flex: 1,
-                pl: 2,
-                display: "flex",
-                flexDirection: "column"}}
-            >
+            <Box sx={tradeBotContentSx}>
                 <Typography
                     variant="h6"
                     gutterBottom
-                    style={{
-                        backgroundColor:
-                            marketState.description !== prevEntry?.marketState.description
-                                ? "rgba(255,235,59,0.3)"
-                                : undefined,
-                    }}
+                    sx={highlightedCellSx(marketState.description !== prevEntry?.marketState.description)}
                 >
                     Range: {marketState.description}
                 </Typography>
                 <Typography
-                  sx={{ mb: 1 }}
-                  style={{
-                    backgroundColor:
-                      availableCash !== prevEntry?.availableCash
-                        ? "rgba(255,235,59,0.3)"
-                        : undefined,
-                  }}
+                  sx={highlightedMetricTextSx(availableCash !== prevEntry?.availableCash, 1)}
                 >
                   Available Cash: {availableCash.toFixed(2)}
                 </Typography>
                 <Typography
-                  sx={{ mb: 2 }}
-                  style={{
-                    backgroundColor:
-                      yesProb !== prevEntry?.marketState.yesProbability
-                        ? "rgba(255,235,59,0.3)"
-                        : undefined,
-                  }}
+                  sx={highlightedMetricTextSx(yesProb !== prevEntry?.marketState.yesProbability, 2)}
                 >
                   Probability (Yes / No): {yesProb.toFixed(4)} / {noProb.toFixed(4)}
                 </Typography>
-                <Typography variant="subtitle1" sx={{marginBottom: 1}}>Desired State</Typography>
-                <TableContainer component={Paper} sx={{mb: 2}}>
+                <Typography variant="subtitle1" sx={sectionTitleSx}>Desired State</Typography>
+                <TableContainer component={Paper} sx={sectionTableSx}>
                     <Table size="small">
                         <TableHead>
                             <TableRow>
@@ -303,53 +269,32 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                                 return (
                                     <TableRow key={i}>
                                         <TableCell
-                                            style={{
-                                                backgroundColor:
-                                                    d.side !== prevD.side ? "rgba(255,235,59,0.3)" : undefined,
-                                            }}
+                                            sx={highlightedCellSx(d.side !== prevD.side)}
                                         >
                                             {d.side}
                                         </TableCell>
                                         <TableCell
-                                            style={{
-                                                backgroundColor:
-                                                    d.amount !== prevD.amount ? "rgba(255,235,59,0.3)" : undefined,
-                                            }}
+                                            sx={highlightedCellSx(d.amount !== prevD.amount)}
                                         >
                                             {d.amount ?? "-"}
                                         </TableCell>
                                         <TableCell
-                                            style={{
-                                                backgroundColor:
-                                                    d.size !== prevD.size ? "rgba(255,235,59,0.3)" : undefined,
-                                            }}
+                                            sx={highlightedCellSx(d.size !== prevD.size)}
                                         >
                                             {d.size ?? "-"}
                                         </TableCell>
                                         <TableCell
-                                            style={{
-                                                backgroundColor:
-                                                    d.limitPrice !== prevD.limitPrice
-                                                        ? "rgba(255,235,59,0.3)"
-                                                        : undefined,
-                                            }}
+                                            sx={highlightedCellSx(d.limitPrice !== prevD.limitPrice)}
                                         >
                                             {d.limitPrice ?? "-"}
                                         </TableCell>
                                         <TableCell
-                                            style={{
-                                                backgroundColor:
-                                                    d.outcome !== prevD.outcome ? "rgba(255,235,59,0.3)" : undefined,
-                                            }}
+                                            sx={highlightedCellSx(d.outcome !== prevD.outcome)}
                                         >
                                             {d.outcome}
                                         </TableCell>
                                         <TableCell
-                                            sx={{ maxWidth: 200, whiteSpace: "normal", wordBreak: "break-all" }}
-                                            style={{
-                                                backgroundColor:
-                                                    errors?.[i] !== prevError ? "rgba(255,235,59,0.3)" : undefined,
-                                            }}
+                                            sx={wrappedHighlightedCellSx(errors?.[i] !== prevError)}
                                         >
                                             {errors?.[i] ?? "-"}
                                         </TableCell>
@@ -359,8 +304,8 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <Typography variant="subtitle1" sx={{marginBottom: 1}}>Market Bets</Typography>
-                <TableContainer component={Paper} sx={{mb: 2}}>
+                <Typography variant="subtitle1" sx={sectionTitleSx}>Market Bets</Typography>
+                <TableContainer component={Paper} sx={sectionTableSx}>
                     <Table size="small">
                         <TableHead>
                             <TableRow>
@@ -373,24 +318,18 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                             <TableRow>
                                 <TableCell>No</TableCell>
                                 <TableCell
-                                    style={{
-                                        backgroundColor:
-                                            marketState?.noToken?.netPrice !== prevEntry?.marketState?.noToken?.netPrice
-                                                ? "rgba(255,235,59,0.3)"
-                                                : undefined,
-                                    }}
+                                    sx={highlightedCellSx(
+                                        marketState?.noToken?.netPrice !== prevEntry?.marketState?.noToken?.netPrice
+                                    )}
                                 >
                                     {Number.isFinite(marketState?.noToken?.netPrice)
                                         ? marketState?.noToken?.netPrice?.toFixed(4)
                                         : "–"}
                                 </TableCell>
                                 <TableCell
-                                    style={{
-                                        backgroundColor:
-                                            marketState?.noToken?.quantity !== prevEntry?.marketState?.noToken?.quantity
-                                                ? "rgba(255,235,59,0.3)"
-                                                : undefined,
-                                    }}
+                                    sx={highlightedCellSx(
+                                        marketState?.noToken?.quantity !== prevEntry?.marketState?.noToken?.quantity
+                                    )}
                                 >
                                     {marketState.noToken.quantity}
                                 </TableCell>
@@ -398,24 +337,18 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                             <TableRow>
                                 <TableCell>Yes</TableCell>
                                 <TableCell
-                                    style={{
-                                        backgroundColor:
-                                            marketState?.yesToken?.netPrice !== prevEntry?.marketState?.yesToken?.netPrice
-                                                ? "rgba(255,235,59,0.3)"
-                                                : undefined,
-                                    }}
+                                    sx={highlightedCellSx(
+                                        marketState?.yesToken?.netPrice !== prevEntry?.marketState?.yesToken?.netPrice
+                                    )}
                                 >
                                     {Number.isFinite(marketState.yesToken.netPrice)
                                         ? marketState?.yesToken?.netPrice?.toFixed(4)
                                         : "–"}
                                 </TableCell>
                                 <TableCell
-                                    style={{
-                                        backgroundColor:
-                                            marketState?.yesToken?.quantity !== prevEntry?.marketState?.yesToken?.quantity
-                                                ? "rgba(255,235,59,0.3)"
-                                                : undefined,
-                                    }}
+                                    sx={highlightedCellSx(
+                                        marketState?.yesToken?.quantity !== prevEntry?.marketState?.yesToken?.quantity
+                                    )}
                                 >
                                     {marketState.yesToken.quantity}
                                 </TableCell>
@@ -427,7 +360,7 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                     Active Orders
                 </Typography>
                 {marketState?.orders?.length ? (
-                    <TableContainer component={Paper} sx={{mb: 2, overflowX: 'auto'}}>
+                    <TableContainer component={Paper} sx={activeOrdersTableSx}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow>
@@ -450,33 +383,20 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                                     return (
                                         <TableRow key={idx}>
                                             <TableCell
-                                                style={{backgroundColor: (ord.orderId || ord.id) !== (prevOrd.orderId || prevOrd.id) ? "rgba(255,235,59,0.3)" : undefined,
-                                                }}
+                                                sx={highlightedCellSx(
+                                                    (ord.orderId || ord.id) !== (prevOrd.orderId || prevOrd.id)
+                                                )}
                                             >
                                                 {ord.orderId || ord.id || '-'}
-                                            </TableCell><TableCell style={{backgroundColor:
-                                                ord.side !== prevOrd.side ? "rgba(255,235,59,0.3)"
-                                                    : undefined,
-                                        }}>{ord.side}</TableCell><TableCell style={{
-                                            backgroundColor:
-                                                ord.size !== prevOrd.size ? "rgba(255,235,59,0.3)"
-                                                    : undefined,
-                                        }}>{ord.size}</TableCell><TableCell style={{
-                                            backgroundColor:
-                                                ord.limitPrice !== prevOrd.limitPrice ? "rgba(255,235,59,0.3)"
-                                                    : undefined,
-                                        }}
+                                            </TableCell>
+                                            <TableCell sx={highlightedCellSx(ord.side !== prevOrd.side)}>{ord.side}</TableCell>
+                                            <TableCell sx={highlightedCellSx(ord.size !== prevOrd.size)}>{ord.size}</TableCell>
+                                            <TableCell sx={highlightedCellSx(ord.limitPrice !== prevOrd.limitPrice)}
                             >
                                 {ord.limitPrice ?? '-'}
                                 </TableCell>
                                 <TableCell>{outcome}</TableCell>
-                                <TableCell style={{
-                                    backgroundColor:
-                                        ord.status !== prevOrd.status
-                                            ? "rgba(255,235,59,0.3)"
-                                            : undefined,
-                                }}
-                                >
+                                <TableCell sx={highlightedCellSx(ord.status !== prevOrd.status)}>
                                     {ord.status ?? '-'}
                                 </TableCell>
                                     </TableRow>
@@ -486,19 +406,17 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                         </Table>
                     </TableContainer>
                 ) : (
-                    <Typography variant="body2" color="textSecondary" sx={{mb: 2}}>
+                    <Typography variant="body2" color="textSecondary" sx={emptyOrdersTextSx}>
                         No active orders
                     </Typography>
                 )}
-                <Accordion sx={{ mt: 1,
-                    boxShadow: 'none'}}
-                >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{fontWeight: 'bold'}}>
+                <Accordion sx={orderBookAccordionSx}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={orderBookSummarySx}>
                         No Token Order Book
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Typography variant="subtitle2" sx={{marginBottom: 1}}>Asks:</Typography>
-                        <TableContainer component={Paper} sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" sx={orderBookLabelSx}>Asks:</Typography>
+                        <TableContainer component={Paper} sx={sectionTableSx}>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
@@ -516,7 +434,7 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        <Typography variant="subtitle2" sx={{marginBottom: 1}}>Bids:</Typography>
+                        <Typography variant="subtitle2" sx={orderBookLabelSx}>Bids:</Typography>
                         <TableContainer component={Paper}>
                             <Table size="small">
                                 <TableHead>
@@ -537,15 +455,13 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                         </TableContainer>
                     </AccordionDetails>
                 </Accordion>
-                <Accordion sx={{ mt: 1,
-                        boxShadow: 'none'}}
-                >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{fontWeight: 'bold'}}>
+                <Accordion sx={orderBookAccordionSx}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={orderBookSummarySx}>
                         Yes Token Order Book
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Typography variant="subtitle2" sx={{marginBottom: 1}}>Asks:</Typography>
-                        <TableContainer component={Paper} sx={{mb: 2}}>
+                        <Typography variant="subtitle2" sx={orderBookLabelSx}>Asks:</Typography>
+                        <TableContainer component={Paper} sx={sectionTableSx}>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
@@ -563,7 +479,7 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        <Typography variant="subtitle2" sx={{marginBottom: 1}}>Bids:</Typography>
+                        <Typography variant="subtitle2" sx={orderBookLabelSx}>Bids:</Typography>
                         <TableContainer component={Paper}>
                             <Table size="small">
                                 <TableHead>
@@ -590,3 +506,92 @@ const TradeBotTable: React.FC<Props> = ({ user, date, location}) => {
 }
 
 export default TradeBotTable
+
+const changedCellBackground = "rgba(255,235,59,0.3)"
+
+const tradeBotEmptyStateSx = {
+    m: 2,
+    textAlign: 'center',
+} as const
+
+const tradeBotRootSx = {
+    display: 'flex',
+    mb: 2,
+    alignItems: 'stretch',
+} as const
+
+const tradeBotTabsColumnSx = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    p: 1,
+} as const
+
+const tradeBotPrevButtonSx = {
+    mr: 1,
+} as const
+
+const tradeBotTabsScrollerSx = {
+    maxHeight: '570px',
+    minWidth: 110,
+    ...scrollbarSx,
+} as const
+
+const tradeBotTabsSx = {
+    '& .MuiTabs-indicator': { left: 0, width: 3, background: 'primary.main' },
+    '& .MuiTab-root': { px: 1.5, textTransform: 'none', fontSize: 13 },
+    '& .MuiTab-root.Mui-selected': { fontWeight: 600, color: 'primary.main' },
+} as const
+
+const tradeBotContentSx = {
+    flex: 1,
+    pl: 2,
+    display: "flex",
+    flexDirection: "column",
+} as const
+
+const sectionTitleSx = {
+    marginBottom: 1,
+} as const
+
+const sectionTableSx = {
+    mb: 2,
+} as const
+
+const activeOrdersTableSx = {
+    mb: 2,
+    overflowX: 'auto',
+} as const
+
+const emptyOrdersTextSx = {
+    mb: 2,
+} as const
+
+const orderBookAccordionSx = {
+    mt: 1,
+    boxShadow: 'none',
+} as const
+
+const orderBookSummarySx = {
+    fontWeight: 'bold',
+} as const
+
+const orderBookLabelSx = {
+    marginBottom: 1,
+} as const
+
+const highlightedCellSx = (changed: boolean) => ({
+    backgroundColor: changed ? changedCellBackground : 'inherit',
+})
+
+const highlightedMetricTextSx = (changed: boolean, marginBottom: number) => ({
+    mb: marginBottom,
+    backgroundColor: changed ? changedCellBackground : 'inherit',
+})
+
+const wrappedHighlightedCellSx = (changed: boolean) => ({
+    maxWidth: 200,
+    whiteSpace: 'normal' as const,
+    wordBreak: 'break-all' as const,
+    backgroundColor: changed ? changedCellBackground : 'inherit',
+})

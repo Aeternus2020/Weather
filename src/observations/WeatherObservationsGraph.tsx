@@ -7,7 +7,6 @@ import {
 import {useWeatherObservationsQuery} from "./useWeatherObservationsQuery"
 import {ResponsiveLine} from '@nivo/line'
 import type { Serie, Layer } from '@nivo/line'
-import type { User } from "firebase/auth"
 import { schemeCategory10 } from 'd3-scale-chromatic'
 import dayjs from 'dayjs'
 import {useWeatherForecastsQuery} from "./useWeatherForecastsQuery"
@@ -42,23 +41,19 @@ function makeKey(d: LineDescriptor): string {
 const NOAA  = 'tgftp.nws.noaa.gov'
 
 interface Props {
-    user: User
     date: string
     location: string
     distributions: Array<Record<string, number>>
 }
 
-const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activeLocation, distributions }) => {
+const WeatherObservationsGraph: React.FC<Props> = ({ date, location: activeLocation, distributions }) => {
     const [visibleLines, setVisibleLines] = useState<string[]>([])
     const [selectedSourcesByLocation, setSelectedSourcesByLocation] = useState<Record<string, string[]>>({})
     const [unit, setUnit] = useState<'C' | 'F'>('C')
 
-    const { data: entries = [], isLoading } = useWeatherObservationsQuery(
-        user.uid,
-        date,
-    )
+    const { data: entries = [], isLoading } = useWeatherObservationsQuery(date)
 
-    const { data: forecastEntries = [] } = useWeatherForecastsQuery(user.uid, date, activeLocation) as {
+    const { data: forecastEntries = [] } = useWeatherForecastsQuery(date, activeLocation) as {
         data: WeatherForecast[]
     }
 
@@ -433,7 +428,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activ
     if (isLoading) return <CircularProgress />
     if (!entries.length) {
         return (
-            <Typography sx={{m: 2, textAlign: 'center'}}>
+            <Typography sx={emptyStateTextSx}>
                 <strong>Weather Observations: </strong>No data for
                 <strong> {activeLocation}</strong> on
                 <strong> {date}</strong>.
@@ -442,20 +437,12 @@ const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activ
     }
 
     return (
-        <Box
-            sx={{
-            position: 'relative',
-            display: "flex",
-            flexDirection: "column",
-            height: "100%",
-            gap: 1,
-        }}
-        >
-            <Typography variant="h4" sx={{m: "8px 16px 0px 16px "}} gutterBottom>
+        <Box sx={graphRootSx}>
+            <Typography variant="h4" sx={graphTitleSx} gutterBottom>
                 Weather Observations
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mb: "40px"}}>
-                <Box sx={{ flexGrow: 1, height: '100%' }}>
+            <Box sx={graphBodySx}>
+                <Box sx={graphMainColumnSx}>
                     <ObservationControls
                         sortedSources={sortedSources}
                         selectedSources={selectedSourcesByLocation[activeLocation] || []}
@@ -466,8 +453,8 @@ const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activ
                         unit={unit}
                         onUnitChange={(u) => setUnit(u)}
                     />
-                    <Box sx={{ display: 'flex', gap: 2, height: '700px' }}>
-                        <Box sx={{ flexGrow: 1 }}>
+                    <Box sx={graphContentRowSx}>
+                        <Box sx={graphChartColumnSx}>
                             <ResponsiveLine
                                 curve="monotoneX"
                                 colors={getColor}
@@ -527,14 +514,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activ
                                     const timeFormatted = dayjs.utc(point.data.x as Date).format('HH:mm')
                                     const timestampFormatted = dayjs.utc(seconds * 1000).format('YYYY-MM-DD HH:mm:ss')
                                     return (
-                                        <Box sx={{
-                                            padding: '8px',
-                                            backgroundColor: '#fff',
-                                            color: '#000',
-                                            boxShadow: '0 0 10px rgba(0,0,0,0.2)',
-                                            borderRadius: '4px',
-                                            minWidth: '160px',
-                                        }}>
+                                        <Box sx={chartTooltipSx}>
                                             <Typography variant="body2" fontWeight="bold">
                                                 Time: <Typography component="span" variant="body2" fontWeight="normal">{timeFormatted}</Typography>
                                             </Typography>
@@ -581,3 +561,50 @@ const WeatherObservationsGraph: React.FC<Props> = ({ user, date, location: activ
 }
 
 export default WeatherObservationsGraph
+
+const emptyStateTextSx = {
+    m: 2,
+    textAlign: 'center',
+} as const
+
+const graphRootSx = {
+    position: 'relative',
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    gap: 1,
+} as const
+
+const graphTitleSx = {
+    m: "8px 16px 0px 16px ",
+} as const
+
+const graphBodySx = {
+    display: 'flex',
+    gap: 1,
+    mb: "40px",
+} as const
+
+const graphMainColumnSx = {
+    flexGrow: 1,
+    height: '100%',
+} as const
+
+const graphContentRowSx = {
+    display: 'flex',
+    gap: 2,
+    height: '700px',
+} as const
+
+const graphChartColumnSx = {
+    flexGrow: 1,
+} as const
+
+const chartTooltipSx = {
+    padding: '8px',
+    backgroundColor: '#fff',
+    color: '#000',
+    boxShadow: '0 0 10px rgba(0,0,0,0.2)',
+    borderRadius: '4px',
+    minWidth: '160px',
+} as const

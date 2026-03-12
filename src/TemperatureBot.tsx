@@ -1,8 +1,6 @@
 import React, {useCallback, useEffect, useState} from "react"
 import dayjs, { Dayjs } from "dayjs"
 import utc from "dayjs/plugin/utc"
-import { onAuthStateChanged, User } from "firebase/auth"
-import { auth } from "./firebase"
 import {
     Box,
     Button,
@@ -26,7 +24,6 @@ const LAST_LOC_KEY = "temperatureBot:lastLocation"
 const locations = ['London','NY'] as const
 
 const TemperatureBotPage: React.FC = () => {
-    const [user, setUser] = useState<User | null>(null)
     const qc = useQueryClient()
     const [distributions, setDistributions] = useState<Array<Record<string, number>>>([])
 
@@ -49,11 +46,6 @@ const TemperatureBotPage: React.FC = () => {
         window.history.replaceState(null, '', `?${params.toString()}`)
     }, [dateParam, selectedLocation])
 
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, setUser)
-        return () => unsub()
-    }, [])
-
     const updateDateParam = useCallback((next: string) => {
         setDateParam(prev => (prev === next ? prev : next))
     }, [])
@@ -61,8 +53,6 @@ const TemperatureBotPage: React.FC = () => {
     const [loading, setLoading] = useState(false)
 
     const handleLoadData = useCallback(async () => {
-        if (!user) return
-
         setLoading(true)
         try {
             await qc.invalidateQueries({ queryKey: ["weather-observations"] })
@@ -72,11 +62,11 @@ const TemperatureBotPage: React.FC = () => {
         } finally {
             setLoading(false)
         }
-    }, [user, qc])
+    }, [qc])
 
     return (
-        <Box sx={{ p: 1, m: 1 }}>
-            <Box sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}>
+        <Box sx={temperatureBotRootSx}>
+            <Box sx={controlsRowSx}>
                 <Button variant="outlined" onClick={() => updateDateParam(
                     date.add(-1, "day").utc().format("YYYY-MM-DD")
                 )}>
@@ -102,57 +92,70 @@ const TemperatureBotPage: React.FC = () => {
                 <Button
                     variant="contained"
                     onClick={handleLoadData}
-                    disabled={!user || loading}
+                    disabled={loading}
                 >
                     {loading ? "Loading…" : "Load Data"}
                 </Button>
             </Box>
 
             {isToday && (
-                <Typography variant="body2" color="textSecondary" sx={{mb: 2}}>
+                <Typography variant="body2" color="textSecondary" sx={todayBannerSx}>
                     You are viewing data for today (UTC).
                 </Typography>
             )}
 
-            {!user ? (
-                <Typography color="error">Please log in to view logs.</Typography>
-            ) : (
-                <>
-                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-                        {locations.map(loc => (
-                            <Button
-                                key={loc}
-                                variant={loc === selectedLocation ? "contained" : "outlined"}
-                                size="small"
-                                onClick={() => setSelectedLocation(loc)}
-                            >
-                                {loc}
-                            </Button>
-                        ))}
-                    </Box>
+            <Box sx={locationButtonsRowSx}>
+                {locations.map(loc => (
+                    <Button
+                        key={loc}
+                        variant={loc === selectedLocation ? "contained" : "outlined"}
+                        size="small"
+                        onClick={() => setSelectedLocation(loc)}
+                    >
+                        {loc}
+                    </Button>
+                ))}
+            </Box>
 
-                    <WeatherObservationsGraph
-                        user={user}
-                        date={dateParam}
-                        location={selectedLocation}
-                        distributions={distributions}
-                    />
+            <WeatherObservationsGraph
+                date={dateParam}
+                location={selectedLocation}
+                distributions={distributions}
+            />
 
-                    <TemperatureEvaluationTable
-                        user={user}
-                        date={dateParam}
-                        location={selectedLocation}
-                        setDistributions={setDistributions}
-                    />
-                    <TradeBotTable
-                        location={selectedLocation}
-                        user={user}
-                        date={dateParam}
-                    />
-                </>
-            )}
+            <TemperatureEvaluationTable
+                date={dateParam}
+                location={selectedLocation}
+                setDistributions={setDistributions}
+            />
+            <TradeBotTable
+                location={selectedLocation}
+                date={dateParam}
+            />
         </Box>
     )
 }
 
 export default TemperatureBotPage
+
+const temperatureBotRootSx = {
+    p: 1,
+    m: 1,
+} as const
+
+const controlsRowSx = {
+    display: "flex",
+    gap: 1,
+    mb: 2,
+    alignItems: "center",
+} as const
+
+const todayBannerSx = {
+    mb: 2,
+} as const
+
+const locationButtonsRowSx = {
+    display: "flex",
+    gap: 1,
+    mb: 2,
+} as const
