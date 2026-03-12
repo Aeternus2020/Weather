@@ -1,0 +1,38 @@
+name: Provider Smoke Checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1"
+
+jobs:
+  smoke-providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REQUIRE_ALL_SECRETS: "1"
+      METOFFICE_API_KEY: ${{ secrets.METOFFICE_API_KEY }}
+      TOMORROW_API_KEY: ${{ secrets.TOMORROW_API_KEY }}
+      WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
+      OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+      PIRATEWEATHER_API_KEY: ${{ secrets.PIRATEWEATHER_API_KEY }}
+      VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
+      CHECKWX_API_KEY: ${{ secrets.CHECKWX_API_KEY }}
+      AVWX_API_KEY: ${{ secrets.AVWX_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --prefix functions
+
+      - name: Run provider smoke checks
+        run: npm --prefix functions run smoke:providers
