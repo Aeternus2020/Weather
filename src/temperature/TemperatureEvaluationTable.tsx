@@ -17,15 +17,13 @@ import {
 import Tooltip from "@mui/material/Tooltip"
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
-import type { User } from "firebase/auth"
 import { useTemperatureEvaluationQuery } from "./useTemperatureEvaluationQuery"
 import type {BasedOnItem} from "./typesTemperatureEvaluation"
 import {convertBoundsToC} from "../observations/components/FahrenheitLinesLayer"
 import {isEqual } from "lodash"
-import {scrollbarSx, useLocalStorageActive} from "../market/TradeBotTable"
+import { TAB_HEIGHT, scrollbarSx, useLocalStorageActive } from "../ui/tabNavigation"
 
 interface Props {
-    user: User
     date: string
     location: string
     setDistributions: (arr: Array<Record<string, number>>) => void
@@ -37,21 +35,18 @@ export const formatTime = (id: string) => {
     return isNaN(d.getTime()) ? "–" : d.toLocaleTimeString()
 }
 
-export const TAB_HEIGHT = 48
-
 const TE_KEY = 'temperatureEvaluation:lastActiveMap'
 
 type Bucket = { key: string; labelF: string; labelC: string }
 
 const TemperatureEvaluationTable: React.FC<Props> = ({
-    user,
     date,
     location,
     setDistributions
     }) => {
     const [active, setActive] = useLocalStorageActive(TE_KEY, date, location)
     const [prevActive, setPrevActive] = useState(active)
-    const { data: entries = [], isLoading } = useTemperatureEvaluationQuery(user, date)
+    const { data: entries = [], isLoading } = useTemperatureEvaluationQuery(date)
 
     const reversedEntries = useMemo(() => {
         return entries
@@ -146,7 +141,7 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
     if (isLoading) return <CircularProgress />
     if (!reversedEntries.length) {
         return (
-            <Typography sx={{m: 2, textAlign: "center"}}>
+            <Typography sx={evaluationEmptyStateSx}>
                 <strong>Temperature Evaluation: </strong>No data for
                 <strong> {location}</strong> on
                 <strong> {date}</strong>.
@@ -163,28 +158,18 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
     const current = reversedEntries[active]
 
     return (
-        <Box sx={{
-            display: "flex",
-            flexDirection: "column",
-            height: "100%",
-            gap: 1,
-            maxWidth: 1200,
-        }}>
-            <Typography variant="h4" sx={{margin: 2}} gutterBottom>
+        <Box sx={evaluationRootSx}>
+            <Typography variant="h4" sx={evaluationTitleSx} gutterBottom>
                 Temperature Evaluation Log
             </Typography>
-        <Box sx={{ mb: 1, display: "flex" }}>
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", px: 1 }}>
+        <Box sx={evaluationBodySx}>
+            <Box sx={evaluationTabsColumnSx}>
                 <IconButton onClick={goPrev} disabled={active === 0} size="small">
                     <KeyboardArrowUpIcon />
                 </IconButton>
                 <Box
                     ref={tabsContainerRef}
-                    sx={{
-                        maxHeight: "570px",
-                        minWidth: 110,
-                        ...scrollbarSx,
-                    }}
+                    sx={evaluationTabsScrollerSx}
                 >
                     <Tabs
                         orientation="vertical"
@@ -194,11 +179,7 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                             setPrevActive(active)
                             setActive(i)
                         }}
-                        sx={{
-                            "& .MuiTabs-indicator": { left: 0, width: 3, background: "primary.main" },
-                            "& .MuiTab-root": { px: 1.5, textTransform: "none", fontSize: 13 },
-                            "& .MuiTab-root.Mui-selected": { fontWeight: 600, color: "primary.main" },
-                        }}
+                        sx={evaluationTabsSx}
                     >
                         {reversedEntries.map(e => (
                             <Tab key={e.id} label={formatTime(e.id)} disableRipple />
@@ -210,9 +191,9 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                 </IconButton>
             </Box>
 
-            <Box sx={{ width: "100%" }}>
-                <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%",height: "40px", marginBottom: "10px"}}>
-                <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 3, a: "5px" }}>
+            <Box sx={evaluationDetailsSx}>
+                <Box sx={evaluationMetaRowSx}>
+                <Box sx={evaluationMetaContentSx}>
                     <Typography variant="body2">DateInQuestion:</Typography>
                     <Typography variant="h6">{current!.dateInQuestion}</Typography>
                     <Typography variant="body2">Location:</Typography>
@@ -223,7 +204,7 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                     <Table size="small">
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ minWidth: 100 }}>Range (°C)</TableCell>
+                                <TableCell sx={rangeHeaderCellSx}>Range (°C)</TableCell>
                                 {basedArr.map(it => (
                                     <TableCell key={it.evaluator}>{it.evaluator}</TableCell>
                                 ))}
@@ -233,7 +214,7 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                         <TableBody>
                             {buckets.map((b, bi) => (
                                 <TableRow key={b.key}>
-                                    <TableCell sx={{ minWidth: 115, userSelect: "none" }}>
+                                    <TableCell sx={rangeValueCellSx}>
                                         <Tooltip title={b.labelC} arrow placement="right">
                                             <span>{b.labelF}</span>
                                         </Tooltip>
@@ -259,7 +240,7 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                                         return (
                                             <TableCell
                                                 key={ej}
-                                                sx={{ backgroundColor: changed ? "rgba(255,235,59,0.3)" : "inherit" }}
+                                                sx={changedValueCellSx(changed)}
                                             >
                                                 {display}
                                             </TableCell>
@@ -273,15 +254,11 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
                                 </TableRow>
                             ))}
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 600 }}>Data</TableCell>
+                                <TableCell sx={dataLabelCellSx}>Data</TableCell>
                                  {basedArr.map((it, ej) => (
                                    <TableCell
                                      key={it.evaluator}
-                                     style={{
-                                       backgroundColor: dataChanged[ej]
-                                         ? "rgba(255,235,59,0.3)"
-                                         : undefined
-                                     }}
+                                     sx={changedDataCellSx(dataChanged[ej])}
                                    >
                                      {it.data || "–"}
                                    </TableCell>
@@ -297,3 +274,87 @@ const TemperatureEvaluationTable: React.FC<Props> = ({
 }
 
 export default TemperatureEvaluationTable
+
+const changedCellBackground = "rgba(255,235,59,0.3)"
+
+const evaluationEmptyStateSx = {
+    m: 2,
+    textAlign: "center",
+} as const
+
+const evaluationRootSx = {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    gap: 1,
+    maxWidth: 1200,
+} as const
+
+const evaluationTitleSx = {
+    margin: 2,
+} as const
+
+const evaluationBodySx = {
+    mb: 1,
+    display: "flex",
+} as const
+
+const evaluationTabsColumnSx = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    px: 1,
+} as const
+
+const evaluationTabsScrollerSx = {
+    maxHeight: "570px",
+    minWidth: 110,
+    ...scrollbarSx,
+} as const
+
+const evaluationTabsSx = {
+    "& .MuiTabs-indicator": { left: 0, width: 3, background: "primary.main" },
+    "& .MuiTab-root": { px: 1.5, textTransform: "none", fontSize: 13 },
+    "& .MuiTab-root.Mui-selected": { fontWeight: 600, color: "primary.main" },
+} as const
+
+const evaluationDetailsSx = {
+    width: "100%",
+} as const
+
+const evaluationMetaRowSx = {
+    display: "flex",
+    justifyContent: "flex-end",
+    width: "100%",
+    height: "40px",
+    marginBottom: "10px",
+} as const
+
+const evaluationMetaContentSx = {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 3,
+    a: "5px",
+} as const
+
+const rangeHeaderCellSx = {
+    minWidth: 100,
+} as const
+
+const rangeValueCellSx = {
+    minWidth: 115,
+    userSelect: "none",
+} as const
+
+const changedValueCellSx = (changed: boolean) => ({
+    backgroundColor: changed ? changedCellBackground : "inherit",
+})
+
+const dataLabelCellSx = {
+    fontWeight: 600,
+} as const
+
+const changedDataCellSx = (changed: boolean) => ({
+    backgroundColor: changed ? changedCellBackground : undefined,
+})

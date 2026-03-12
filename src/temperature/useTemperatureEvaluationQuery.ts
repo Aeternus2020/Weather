@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import type { TemperatureEvaluation } from './typesTemperatureEvaluation'
-import type { User } from 'firebase/auth'
 import { db } from '../firebase'
 import {
     collection,
@@ -12,14 +11,11 @@ import {
 } from 'firebase/firestore'
 
 export function useTemperatureEvaluationQuery(
-    user: User | null,
     date: string,
 ) {
     return useQuery<TemperatureEvaluation[], Error>({
-        queryKey: ['temperature-evaluation', user?.uid, date],
+        queryKey: ['temperature-evaluation', date],
         queryFn: async () => {
-            if (!user) return []
-
             const q = query(
                 collection(db, 'temperature-evaluation-log'),
                 where('dateInQuestion', '==', date),
@@ -35,8 +31,6 @@ export function useTemperatureEvaluationQuery(
 
             return data
         },
-
-        enabled: Boolean(user),
         staleTime: Infinity,
         gcTime: Infinity,
         refetchOnWindowFocus: true,

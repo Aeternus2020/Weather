@@ -11,15 +11,12 @@ import {
 } from 'firebase/firestore'
 
 export function useWeatherForecastsQuery(
-    userId: string | null,
     date: string,
     location: string,
 ) {
     return useQuery<WeatherForecast[], Error>({
-        queryKey: ['weather-forecasts', userId, date, location],
+        queryKey: ['weather-forecasts', date, location],
         queryFn: async () => {
-            if (!userId) return []
-
             const dayStart = Timestamp.fromDate(new Date(`${date}T00:00:00Z`))
             const dayEnd   = Timestamp.fromDate(new Date(`${date}T23:59:59Z`))
 
@@ -47,7 +44,6 @@ export function useWeatherForecastsQuery(
 
             return data
         },
-        enabled: !!userId,
         staleTime: Infinity,
         gcTime: Infinity,
         refetchOnWindowFocus: true,

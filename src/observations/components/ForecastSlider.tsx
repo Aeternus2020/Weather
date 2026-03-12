@@ -12,7 +12,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check'
 import dayjs from 'dayjs'
 import { WeatherForecast } from '../typesWeatherObservations'
-import { scrollbarSx } from '../../market/TradeBotTable'
+import { scrollbarSx } from '../../ui/tabNavigation'
 import {makeForecastKey} from "../WeatherObservationsGraph";
 
 interface ForecastDriverProps {
@@ -45,20 +45,12 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
 
     return (
         <ClickAwayListener onClickAway={() => setOpen(false)}>
-        <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Box sx={forecastSliderRootSx}>
             <Button
                 variant="outlined"
                 onClick={handleToggle}
                 disabled={!hasForecasts}
-                sx={{
-                    m: 0.5,
-                    minWidth: 30,
-                    width: 35,
-                    writingMode: 'vertical-rl',
-                    textOrientation: 'upright',
-                    letterSpacing: '0.1em',
-                    height: "30%",
-                }}
+                sx={forecastToggleButtonSx}
             >
                 Forecasts
             </Button>
@@ -66,14 +58,7 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                 variant="outlined"
                 onClick={() => toggleLatestForecasts(!allChecked)}
                 disabled={!hasForecasts}
-                sx={{
-                    m: 0.5,
-                    minWidth: 30,
-                    width: 35,
-                    writingMode: 'vertical-rl',
-                    textOrientation: 'upright',
-                    height: "60%",
-                }}
+                sx={latestForecastButtonSx}
             >
                 {allChecked ? 'Hide latest forecasts' : 'Show latest forecasts'}
             </Button>
@@ -89,33 +74,16 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                 unmountOnExit>
                 <Paper
                     elevation={4}
-                    sx={{
-                        zIndex: 10,
-                        position: 'absolute',
-                        right: 50,
-                        gap: 1,
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        width: '27vw',
-                        borderRadius: '15px',
-                        p: 2,
-                        boxSizing: 'border-box',
-                        ...scrollbarSx,
-                    }}
+                    sx={forecastPanelSx}
                 >
                     {Object.entries(forecastBySource).map(([src, entries]) => {
                         const ids = entries.map(makeForecastId)
                         const allChecked = ids.every(id => visibleIds.includes(id))
 
                         return (
-                            <Box key={src} sx={{ mb: 1, width: '130px' }}>
+                            <Box key={src} sx={sourceForecastGroupSx}>
                                 <FormControlLabel
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'flex-start',
-                                        width: '100%',
-                                    }}
+                                    sx={sourceToggleLabelSx}
                                     control={
                                         <Checkbox
                                             disableRipple
@@ -123,18 +91,9 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                                             onChange={e => toggleAllForSource(src, e.target.checked)}
                                         />
                                     }
-                                    label={<Typography sx={{ fontWeight: 400, fontSize: '0.8rem' }}>{src}</Typography>}
+                                    label={<Typography sx={sourceNameTextSx}>{src}</Typography>}
                                 />
-                                <Box
-                                    sx={{
-                                        ml: 3,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 1,
-                                        maxHeight: 200,
-                                        ...scrollbarSx,
-                                    }}
-                                >
+                                <Box sx={forecastTimesListSx}>
                                     {entries
                                         .slice()
                                         .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
@@ -149,15 +108,15 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                                                     control={
                                                         <Checkbox
                                                             disableRipple
-                                                            icon={<CheckIcon sx={{ visibility: 'hidden' }} />}
-                                                            checkedIcon={<CheckIcon sx={{ color: colorMap[id] }} />}
+                                                            icon={<CheckIcon sx={hiddenCheckIconSx} />}
+                                                            checkedIcon={<CheckIcon sx={forecastCheckIconSx(colorMap[id])} />}
                                                             checked={checked}
                                                             onChange={() => toggleForecast(id)}
-                                                            sx={{ p: 0, '& .MuiSvgIcon-root': { fontSize: 16 } }}
+                                                            sx={forecastCheckboxSx}
                                                         />
                                                     }
-                                                    label={<Typography sx={{ color: colorMap[id], fontSize: '0.9rem' }}>{timeLabel}</Typography>}
-                                                    sx={{ ml: 0 }}
+                                                    label={<Typography sx={forecastTimeLabelSx(colorMap[id])}>{timeLabel}</Typography>}
+                                                    sx={forecastTimeRowSx}
                                                 />
                                             )
                                         })}
@@ -171,3 +130,91 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
         </ClickAwayListener>
     )
 }
+
+const forecastSliderRootSx = {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+} as const
+
+const forecastToggleButtonSx = {
+    m: 0.5,
+    minWidth: 30,
+    width: 35,
+    writingMode: 'vertical-rl',
+    textOrientation: 'upright',
+    letterSpacing: '0.1em',
+    height: "30%",
+} as const
+
+const latestForecastButtonSx = {
+    m: 0.5,
+    minWidth: 30,
+    width: 35,
+    writingMode: 'vertical-rl',
+    textOrientation: 'upright',
+    height: "60%",
+} as const
+
+const forecastPanelSx = {
+    zIndex: 10,
+    position: 'absolute',
+    right: 50,
+    gap: 1,
+    display: 'flex',
+    flexWrap: 'wrap',
+    width: '27vw',
+    borderRadius: '15px',
+    p: 2,
+    boxSizing: 'border-box',
+    ...scrollbarSx,
+} as const
+
+const sourceForecastGroupSx = {
+    mb: 1,
+    width: '130px',
+} as const
+
+const sourceToggleLabelSx = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: '100%',
+} as const
+
+const sourceNameTextSx = {
+    fontWeight: 400,
+    fontSize: '0.8rem',
+} as const
+
+const forecastTimesListSx = {
+    ml: 3,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    maxHeight: 200,
+    ...scrollbarSx,
+} as const
+
+const hiddenCheckIconSx = {
+    visibility: 'hidden',
+} as const
+
+const forecastCheckIconSx = (color: string) => ({
+    color,
+})
+
+const forecastCheckboxSx = {
+    p: 0,
+    '& .MuiSvgIcon-root': { fontSize: 16 },
+} as const
+
+const forecastTimeLabelSx = (color: string) => ({
+    color,
+    fontSize: '0.9rem',
+})
+
+const forecastTimeRowSx = {
+    ml: 0,
+} as const
