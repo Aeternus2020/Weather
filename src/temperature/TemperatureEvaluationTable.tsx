@@ -19,9 +19,10 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
 import { useTemperatureEvaluationQuery } from "./useTemperatureEvaluationQuery"
 import type {BasedOnItem} from "./typesTemperatureEvaluation"
-import {convertBoundsToC} from "../observations/components/FahrenheitLinesLayer"
+import {convertBoundsToC} from "../observations/chart/useFahrenheitLinesLayer"
 import {isEqual } from "lodash"
-import { TAB_HEIGHT, scrollbarSx, useLocalStorageActive } from "../ui/tabNavigation"
+import { scrollbarSx } from "../ui/scrollbarSx"
+import { TAB_HEIGHT, useLocalStorageActive } from "../ui/tabUiState"
 
 interface Props {
     date: string
