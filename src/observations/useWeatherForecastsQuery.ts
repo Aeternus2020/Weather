@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import type {WeatherForecast} from './typesWeatherObservations'
+import type { ForecastPoint, WeatherForecast } from './typesWeatherObservations'
 import { db } from '../firebase'
+import { logQueryError } from './queryError'
 import {
     collection,
     getDocs,
@@ -10,6 +11,40 @@ import {
     Timestamp,
 } from 'firebase/firestore'
 
+function normalizeForecastPoints(value: unknown): ForecastPoint[] {
+    if (!Array.isArray(value)) {
+        return []
+    }
+
+    return value.flatMap((candidate) => {
+        if (!isRecord(candidate) || !isRecord(candidate.time)) {
+            return []
+        }
+
+        const seconds = candidate.time.seconds
+        const temp = candidate.temp
+        const probability = candidate.probability as ForecastPoint['probability'] | undefined
+
+        if (!isFiniteNumber(seconds) || !isFiniteNumber(temp)) {
+            return []
+        }
+
+        return [{
+            time: { seconds },
+            temp,
+            probability: probability ?? null,
+        }]
+    })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
+}
+
+function isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value)
+}
+
 export function useWeatherForecastsQuery(
     date: string,
     location: string,
@@ -17,37 +52,41 @@ export function useWeatherForecastsQuery(
     return useQuery<WeatherForecast[], Error>({
         queryKey: ['weather-forecasts', date, location],
         queryFn: async () => {
-            const dayStart = Timestamp.fromDate(new Date(`${date}T00:00:00Z`))
-            const dayEnd   = Timestamp.fromDate(new Date(`${date}T23:59:59Z`))
+            try {
+                const dayStart = Timestamp.fromDate(new Date(`${date}T00:00:00Z`))
+                const dayEnd   = Timestamp.fromDate(new Date(`${date}T23:59:59Z`))
 
-            const collRef = collection(db, 'weather-forecasts')
-            const q = query(
-                collRef,
-                where('location',  '==', location),
-                where('timestamp', '>=', dayStart),
-                where('timestamp', '<',  dayEnd),
-                orderBy('timestamp', 'asc'),
-            )
+                const collRef = collection(db, 'weather-forecasts')
+                const q = query(
+                    collRef,
+                    where('location',  '==', location),
+                    where('timestamp', '>=', dayStart),
+                    where('timestamp', '<',  dayEnd),
+                    orderBy('timestamp', 'asc'),
+                )
 
-            const snap = await getDocs(q)
-            const data = snap.docs.map((doc) => {
-                const raw = doc.data()
-                return {
-                    id: doc.id,
-                    source: raw.source,
-                    location: raw.location,
-                    timestamp: raw.timestamp,
-                    forecast: raw.forecast ?? [],
-                } as WeatherForecast
-            })
-                .filter(f => Array.isArray(f.forecast) && f.forecast.length > 0)
+                const snap = await getDocs(q)
+                const data = snap.docs.map((doc) => {
+                    const raw = doc.data()
+                    const forecast: WeatherForecast = {
+                        id: doc.id,
+                        source: raw.source,
+                        location: raw.location,
+                        timestamp: raw.timestamp,
+                        forecast: normalizeForecastPoints(raw.forecast),
+                    }
 
-            return data
+                    return forecast
+                })
+                    .filter((forecast) => forecast.forecast.length > 0)
+
+                return data
+            } catch (error) {
+                logQueryError('weather-forecasts', error)
+                throw error
+            }
         },
-        staleTime: Infinity,
-        gcTime: Infinity,
-        refetchOnWindowFocus: true,
-        refetchOnMount: true,
+        enabled: Boolean(date && location),
         refetchOnReconnect: true,
     })
 }

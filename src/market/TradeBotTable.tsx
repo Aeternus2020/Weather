@@ -21,7 +21,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import {useTradeBotQuery} from "./useTradeBotQuery"
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
-import { TAB_HEIGHT, scrollbarSx, useLocalStorageActive } from "../ui/tabNavigation"
+import { scrollbarSx } from "../ui/scrollbarSx"
+import { TAB_HEIGHT, useLocalStorageActive } from "../ui/tabUiState"
 import type {OrderType, TradeBotLog} from "./typesTradeBot"
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
