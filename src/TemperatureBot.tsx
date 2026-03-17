@@ -16,7 +16,6 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs"
 import WeatherObservationsGraph from "./observations/WeatherObservationsGraph"
 import TemperatureEvaluationTable from "./temperature/TemperatureEvaluationTable"
 import { useQueryClient } from "@tanstack/react-query"
-import TradeBotTable from "./market/TradeBotTable"
 
 dayjs.extend(utc)
 
@@ -79,7 +78,6 @@ const TemperatureBotPage: React.FC = () => {
             await qc.invalidateQueries({ queryKey: ["weather-observations"] })
             await qc.invalidateQueries({ queryKey: ["weather-forecasts"] })
             await qc.invalidateQueries({ queryKey: ["temperature-evaluation"] })
-            await qc.invalidateQueries({ queryKey: ["tradeBot"] })
         } finally {
             setLoading(false)
         }
@@ -172,10 +170,6 @@ const TemperatureBotPage: React.FC = () => {
                 date={dateParam}
                 location={selectedLocation}
                 setDistributions={setDistributions}
-            />
-            <TradeBotTable
-                location={selectedLocation}
-                date={dateParam}
             />
         </Box>
     )
