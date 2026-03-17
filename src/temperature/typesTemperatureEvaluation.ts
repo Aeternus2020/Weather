@@ -1,15 +1,20 @@
+export interface TimestampValue {
+    seconds: number
+    nanoseconds?: number
+}
+
 export interface BasedOnItem {
     evaluator: string
     data: string
-    timestamp: object
-    p?: Record<string, number>
+    timestamp: TimestampValue
+    p: Record<string, number>
 }
 
 export interface TemperatureEvaluation {
     id: string
-    timestamp?: object
-    basedOn?: BasedOnItem[]
-    p?: Record<string, number>
+    timestamp: TimestampValue
+    basedOn: BasedOnItem[]
+    p: Record<string, number>
     dateInQuestion: string
     location: string
 }

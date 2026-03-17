@@ -126,7 +126,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
                     Weather Observations
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    Last updated (UTC): observations {latestObservationsUpdatedUtc} • forecasts {latestForecastUpdatedUtc}
+                    Updated (UTC): observations: {latestObservationsUpdatedUtc} • forecasts: {latestForecastUpdatedUtc}
                 </Typography>
             </Box>
             {isForecastError && (

@@ -184,7 +184,7 @@ export function useWeatherObservationsGraphModel({
         }, null)
 
         return latestTimestamp
-            ? dayjs.utc(latestTimestamp).format('YYYY-MM-DD HH:mm')
+            ? dayjs.utc(latestTimestamp).format('D MMM, HH:mm')
             : '–'
     }, [entries])
 
@@ -197,7 +197,7 @@ export function useWeatherObservationsGraphModel({
             ...forecastEntries.map((entry) => entry.timestamp.seconds),
         )
 
-        return dayjs.unix(latestRunSeconds).utc().format('YYYY-MM-DD HH:mm')
+        return dayjs.unix(latestRunSeconds).utc().format('D MMM, HH:mm')
     }, [forecastEntries])
 
     const latestForecastIds = useMemo(() => {
