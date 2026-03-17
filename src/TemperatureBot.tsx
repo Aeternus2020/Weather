@@ -4,6 +4,7 @@ import utc from "dayjs/plugin/utc"
 import {
     Box,
     Button,
+    Paper,
     Typography,
 } from "@mui/material"
 import {
@@ -23,9 +24,19 @@ const LAST_DATE_KEY = "temperatureBot:lastDate"
 const LAST_LOC_KEY = "temperatureBot:lastLocation"
 const locations = ['London','NY'] as const
 
+function formatLocalComputerTime(now: Date): string {
+    return new Intl.DateTimeFormat(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZoneName: 'short',
+    }).format(now)
+}
+
 const TemperatureBotPage: React.FC = () => {
     const qc = useQueryClient()
     const [distributions, setDistributions] = useState<Array<Record<string, number>>>([])
+    const [localClock, setLocalClock] = useState(() => new Date())
 
     const [dateParam, setDateParam] = useState<string>(() =>
           localStorage.getItem(LAST_DATE_KEY) ?? dayjs.utc().format('YYYY-MM-DD')
@@ -45,6 +56,16 @@ const TemperatureBotPage: React.FC = () => {
         params.set('loc',  selectedLocation)
         window.history.replaceState(null, '', `?${params.toString()}`)
     }, [dateParam, selectedLocation])
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setLocalClock(new Date())
+        }, 60_000)
+
+        return () => {
+            window.clearInterval(intervalId)
+        }
+    }, [])
 
     const updateDateParam = useCallback((next: string) => {
         setDateParam(prev => (prev === next ? prev : next))
@@ -117,6 +138,30 @@ const TemperatureBotPage: React.FC = () => {
                 ))}
             </Box>
 
+            <Paper variant="outlined" sx={pageContextPaperSx}>
+                <Box sx={pageContextMetaRowSx}>
+                    <Box sx={pageContextMetaItemSx}>
+                        <Typography variant="body2" color="text.secondary">
+                            Location
+                        </Typography>
+                        <Typography variant="subtitle1">
+                            {selectedLocation}
+                        </Typography>
+                    </Box>
+                    <Box sx={pageContextMetaItemSx}>
+                        <Typography variant="body2" color="text.secondary">
+                            UTC day
+                        </Typography>
+                        <Typography variant="subtitle1">
+                            {dateParam}
+                        </Typography>
+                    </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                    All update times below are shown in UTC. Local time: {formatLocalComputerTime(localClock)}.
+                </Typography>
+            </Paper>
+
             <WeatherObservationsGraph
                 date={dateParam}
                 location={selectedLocation}
@@ -158,4 +203,23 @@ const locationButtonsRowSx = {
     display: "flex",
     gap: 1,
     mb: 2,
+} as const
+
+const pageContextPaperSx = {
+    mb: 2,
+    p: { xs: 1.2, md: 1.5 },
+} as const
+
+const pageContextMetaRowSx = {
+    display: "flex",
+    gap: { xs: 1.5, md: 2.2 },
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    mb: 0.45,
+} as const
+
+const pageContextMetaItemSx = {
+    display: "inline-flex",
+    gap: 0.75,
+    alignItems: "baseline",
 } as const

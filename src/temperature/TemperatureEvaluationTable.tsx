@@ -1,28 +1,39 @@
-import React, {useEffect, useMemo, useRef, useState} from "react"
+import { useEffect, useMemo, useRef } from 'react'
 import {
-    Table,
-    TableHead,
-    TableBody,
-    TableRow,
-    TableCell,
-    Paper,
-    TableContainer,
-    CircularProgress,
-    Typography,
-    Tabs,
-    Tab,
     Box,
+    Button,
+    CircularProgress,
     IconButton,
-} from "@mui/material"
-import Tooltip from "@mui/material/Tooltip"
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp"
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
-import { useTemperatureEvaluationQuery } from "./useTemperatureEvaluationQuery"
-import type {BasedOnItem} from "./typesTemperatureEvaluation"
-import {convertBoundsToC} from "../observations/chart/useFahrenheitLinesLayer"
-import {isEqual } from "lodash"
-import { scrollbarSx } from "../ui/scrollbarSx"
-import { TAB_HEIGHT, useLocalStorageActive } from "../ui/tabUiState"
+    Paper,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Tabs,
+    Tooltip,
+    Typography,
+    useMediaQuery,
+} from '@mui/material'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft'
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
+import { alpha, useTheme } from '@mui/material/styles'
+import type { BasedOnItem } from './typesTemperatureEvaluation'
+import { useTemperatureEvaluationQuery } from './useTemperatureEvaluationQuery'
+import { convertBoundsToC } from '../observations/chart/useFahrenheitLinesLayer'
+import { getQueryErrorInfo } from '../observations/queryError'
+import { scrollbarSx } from '../ui/scrollbarSx'
+import { useLocalStorageActive } from '../ui/tabUiState'
+
+const LAST_ACTIVE_STORAGE_KEY = 'temperatureEvaluation:lastActiveMap'
+const SNAPSHOT_TAB_HEIGHT = 48
+const SNAPSHOT_TAB_WIDTH = 92
+const CHANGED_CELL_BACKGROUND = alpha('#B7D4F9', 0.42)
+const TABLE_BORDER_COLOR = alpha('#90A9CD', 0.38)
 
 interface Props {
     date: string
@@ -30,332 +41,617 @@ interface Props {
     setDistributions: (arr: Array<Record<string, number>>) => void
 }
 
-export const formatTime = (id: string) => {
-    const iso = id.split("_", 3)[2]
-    const d = new Date(iso)
-    return isNaN(d.getTime()) ? "–" : d.toLocaleTimeString()
+type Bucket = {
+    key: string
+    labelF: string
+    labelC: string
 }
 
-const TE_KEY = 'temperatureEvaluation:lastActiveMap'
+function formatSnapshotTime(snapshotId: string): string {
+    const timestampIso = snapshotId.split('_', 3)[2] ?? ''
+    const snapshotDate = new Date(timestampIso)
 
-type Bucket = { key: string; labelF: string; labelC: string }
+    if (Number.isNaN(snapshotDate.getTime())) {
+        return '–'
+    }
 
-const TemperatureEvaluationTable: React.FC<Props> = ({
+    const hoursUtc = String(snapshotDate.getUTCHours()).padStart(2, '0')
+    const minutesUtc = String(snapshotDate.getUTCMinutes()).padStart(2, '0')
+    const secondsUtc = String(snapshotDate.getUTCSeconds()).padStart(2, '0')
+
+    return `${hoursUtc}:${minutesUtc}:${secondsUtc}`
+}
+
+function formatSnapshotUpdatedAt(timestampSeconds: number): string {
+    return new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'UTC',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).format(new Date(timestampSeconds * 1000))
+}
+
+function clampActiveSnapshotIndex(
+    index: number,
+    totalSnapshots: number,
+): number {
+    if (totalSnapshots <= 0) {
+        return 0
+    }
+
+    return Math.min(Math.max(index, 0), totalSnapshots - 1)
+}
+
+function formatBucketValue(
+    item: BasedOnItem,
+    probability: number | undefined,
+): string | number {
+    if (
+        item.evaluator === 'forecast'
+        || item.evaluator === 'temperature prediction model'
+    ) {
+        return `${Math.round((probability ?? 0) * 100)}%`
+    }
+
+    if (item.evaluator === 'maxTempReached' && typeof probability === 'number') {
+        const fixedProbability = probability.toFixed(1)
+        return fixedProbability.endsWith('.0')
+            ? fixedProbability.slice(0, -2)
+            : fixedProbability
+    }
+
+    if (item.evaluator === 'certain' && probability != null) {
+        return probability
+    }
+
+    return '–'
+}
+
+const TemperatureEvaluationTable = ({
     date,
     location,
-    setDistributions
-    }) => {
-    const [active, setActive] = useLocalStorageActive(TE_KEY, date, location)
-    const [prevActive, setPrevActive] = useState(active)
-    const { data: entries = [], isLoading } = useTemperatureEvaluationQuery(date)
+    setDistributions,
+}: Props) => {
+    const theme = useTheme()
+    const isVerticalTabs = useMediaQuery(theme.breakpoints.up('lg'))
+    const styles = getTemperatureEvaluationTableStyles(isVerticalTabs)
+    const [active, setActive] = useLocalStorageActive(
+        LAST_ACTIVE_STORAGE_KEY,
+        date,
+        location,
+    )
+    const {
+        data: entries = [],
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useTemperatureEvaluationQuery(date, location)
 
-    const reversedEntries = useMemo(() => {
-        return entries
-            .filter(e => e.location === location)
-            .slice()
-            .reverse()
-    }, [entries, location])
-
-    const total = reversedEntries.length
+    const reversedEntries = entries.slice().reverse()
+    const totalSnapshots = reversedEntries.length
+    const activeIndex = clampActiveSnapshotIndex(active, totalSnapshots)
+    const currentSnapshot = reversedEntries[activeIndex] ?? null
+    const previousSnapshot = reversedEntries[activeIndex + 1] ?? null
+    const latestEvaluationUpdatedUtc = reversedEntries[0]
+        ? formatSnapshotUpdatedAt(reversedEntries[0].timestamp.seconds)
+        : '–'
+    const errorInfo = getQueryErrorInfo(error)
 
     useEffect(() => {
-        setPrevActive(0)
-    }, [date])
-
-    const prev = useMemo(() => {
-        return (prevActive >= 0 && prevActive < total)
-            ? reversedEntries[prevActive]
-            : null
-    }, [prevActive, reversedEntries, total])
+        if (active !== activeIndex) {
+            setActive(activeIndex)
+        }
+    }, [active, activeIndex, setActive])
 
     const {
-        basedArr,
-        anyWithP,
+        basedOnItems,
+        firstEvaluatorWithProbabilities,
         buckets,
-        diffMatrix,
-        dataChanged
+        probabilityChangedByBucket,
+        dataChangedByEvaluator,
     } = useMemo(() => {
-        const current = reversedEntries[active]
-        const basedArr: BasedOnItem[] = current?.basedOn ?? []
-        const anyWithP = basedArr.find(b => b.p && Object.keys(b.p).length) || null
-        const pKeys = anyWithP ? Object.keys(anyWithP.p!).sort((a, b) => parseFloat(a) - parseFloat(b)) : []
+        const basedOnItems = currentSnapshot?.basedOn ?? []
+        const previousBasedOnItems = previousSnapshot?.basedOn ?? []
+        const firstEvaluatorWithProbabilities = basedOnItems.find(
+            (item) => Object.keys(item.p).length > 0,
+        ) ?? null
+        const bucketKeys = firstEvaluatorWithProbabilities
+            ? Object.keys(firstEvaluatorWithProbabilities.p).sort(
+                (left, right) => parseFloat(left) - parseFloat(right),
+            )
+            : []
 
-        const buckets: Bucket[] = pKeys.map(key => {
-            const [minStr, maxStr] = key.split("..")
-            const hasMin = minStr === "-999F"
-            const hasMax = maxStr === "999F"
-            const minF   = hasMin ? -999 : parseFloat(minStr.replace("F", ""))
-            const maxF   = hasMax ?  999 : parseFloat(maxStr.replace("F", ""))
-            const [cMin, cMax] = convertBoundsToC(minF, maxF, location)
-            const labelF = `${hasMin ? "-∞" : minF}…${hasMax ? "∞" : maxF}°F`
-            const labelC = `${hasMin ? "-∞" : cMin}…${hasMax ? "∞" : cMax}°C`
+        const buckets = bucketKeys.map((key) => {
+            const [minStr, maxStr] = key.split('..')
+            const hasMin = minStr === '-999F'
+            const hasMax = maxStr === '999F'
+            const minF = hasMin ? -999 : parseFloat(minStr.replace('F', ''))
+            const maxF = hasMax ? 999 : parseFloat(maxStr.replace('F', ''))
+            const [minC, maxC] = convertBoundsToC(minF, maxF, location)
+            const labelF = `${hasMin ? '-∞' : minF}…${hasMax ? '∞' : maxF}°F`
+            const labelC = `${hasMin ? '-∞' : minC}…${hasMax ? '∞' : maxC}°C`
+
             return { key, labelF, labelC }
         })
 
-        const diffMatrix = buckets.map(b =>
-            basedArr.map((item, idx) => {
-                const cur = item.p?.[b.key] ?? null
-                const prevVal = prev?.basedOn?.[idx]?.p?.[b.key] ?? null
-                if (cur === null && prevVal === null) return false
-                if (item.evaluator === 'certain') return cur !== prevVal
-                const curPct = cur != null ? Math.round(cur * 100) : null
-                const prevPct = prevVal != null ? Math.round(prevVal * 100) : null
-                return curPct !== prevPct
-            })
+        const probabilityChangedByBucket = buckets.map((bucket) =>
+            basedOnItems.map((item, index) => {
+                const previousItem = previousBasedOnItems[index]
+                const currentProbability = item.p[bucket.key] ?? null
+                const previousProbability = previousItem?.p[bucket.key] ?? null
+
+                if (currentProbability === null && previousProbability === null) {
+                    return false
+                }
+
+                if (item.evaluator === 'certain') {
+                    return currentProbability !== previousProbability
+                }
+
+                const currentPercent = currentProbability != null
+                    ? Math.round(currentProbability * 100)
+                    : null
+                const previousPercent = previousProbability != null
+                    ? Math.round(previousProbability * 100)
+                    : null
+
+                return currentPercent !== previousPercent
+            }),
         )
 
-        const dataChanged = basedArr.map((item, idx) => {
-            const curNorm = (item.data ?? "").trim()
-            const prevNorm = (prev?.basedOn?.[idx]?.data ?? "").trim()
-            return curNorm !== prevNorm
+        const dataChangedByEvaluator = basedOnItems.map((item, index) => {
+            const previousItem = previousBasedOnItems[index]
+            const currentData = item.data.trim()
+            const previousData = previousItem?.data.trim() ?? ''
+
+            return currentData !== previousData
         })
 
-        return { basedArr, anyWithP, pKeys, buckets, diffMatrix, dataChanged }
-    }, [reversedEntries, active, prev])
-
-    const distArr = useMemo(
-        () => basedArr.map(it => it.p ?? {}),
-        [basedArr]
-    )
-
-    const prevRef = useRef<typeof distArr | null>(null)
-    useEffect(() => {
-        if (!isEqual(prevRef.current, distArr)) {
-            setDistributions(distArr)
-            prevRef.current = distArr
+        return {
+            basedOnItems,
+            firstEvaluatorWithProbabilities,
+            buckets,
+            probabilityChangedByBucket,
+            dataChangedByEvaluator,
         }
-        }, [distArr, setDistributions])
+    }, [currentSnapshot, previousSnapshot, location])
+
+    useEffect(() => {
+        setDistributions(basedOnItems.map((item) => item.p))
+    }, [basedOnItems, setDistributions])
 
     const tabsContainerRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        const c = tabsContainerRef.current
+        const tabsContainer = tabsContainerRef.current
 
-        if (c) {
-            const top = active * TAB_HEIGHT
-            const bottom = top + TAB_HEIGHT
-            if (top < c.scrollTop) c.scrollTop = top
-            else if (bottom > c.scrollTop + c.clientHeight) c.scrollTop = bottom - c.clientHeight
+        if (!tabsContainer) {
+            return
         }
-    }, [active])
 
-    if (isLoading) return <CircularProgress />
+        if (!isVerticalTabs) {
+            const hiddenLeftEdge = activeIndex * SNAPSHOT_TAB_WIDTH
+            const hiddenRightEdge = hiddenLeftEdge + SNAPSHOT_TAB_WIDTH
+
+            if (hiddenLeftEdge < tabsContainer.scrollLeft) {
+                tabsContainer.scrollLeft = hiddenLeftEdge
+            } else if (
+                hiddenRightEdge
+                > tabsContainer.scrollLeft + tabsContainer.clientWidth
+            ) {
+                tabsContainer.scrollLeft = hiddenRightEdge - tabsContainer.clientWidth
+            }
+
+            return
+        }
+
+        const hiddenTopEdge = activeIndex * SNAPSHOT_TAB_HEIGHT
+        const hiddenBottomEdge = hiddenTopEdge + SNAPSHOT_TAB_HEIGHT
+
+        if (hiddenTopEdge < tabsContainer.scrollTop) {
+            tabsContainer.scrollTop = hiddenTopEdge
+        } else if (
+            hiddenBottomEdge
+            > tabsContainer.scrollTop + tabsContainer.clientHeight
+        ) {
+            tabsContainer.scrollTop = hiddenBottomEdge - tabsContainer.clientHeight
+        }
+    }, [activeIndex, isVerticalTabs])
+
+    if (isLoading) {
+        return (
+            <Paper sx={styles.loadingPaper}>
+                <CircularProgress />
+            </Paper>
+        )
+    }
+
+    if (isError) {
+        return (
+            <Paper sx={styles.statusPaper}>
+                <Box sx={styles.errorStateRow}>
+                    <Box sx={styles.errorTextBlock}>
+                        <Typography sx={styles.errorTitle}>
+                            Temperature evaluation is temporarily unavailable.
+                        </Typography>
+                        <Typography color='text.secondary' variant='body2'>
+                            {errorInfo.details ?? errorInfo.summary}
+                        </Typography>
+                    </Box>
+                    <Button
+                        onClick={() => void refetch()}
+                        size='small'
+                        sx={{ flexShrink: 0 }}
+                        variant='outlined'
+                    >
+                        Try again
+                    </Button>
+                </Box>
+            </Paper>
+        )
+    }
+
     if (!reversedEntries.length) {
         return (
-            <Typography sx={evaluationEmptyStateSx}>
-                <strong>Temperature Evaluation: </strong>No data for
-                <strong> {location}</strong> on
-                <strong> {date}</strong>.
-            </Typography>
+            <Paper sx={styles.compactStatusPaper}>
+                <Typography sx={{ m: 2, textAlign: 'center' }}>
+                    <strong>Open-Meteo Evaluation: </strong>
+                    No data for
+                    <strong> {location}</strong> on
+                    <strong> {date}</strong>.
+                </Typography>
+            </Paper>
         )
+    }
 
-        }
+    if (!firstEvaluatorWithProbabilities || !currentSnapshot) {
+        return (
+            <Paper sx={styles.compactStatusPaper}>
+                <Typography>No Open-Meteo distributions for {date}.</Typography>
+            </Paper>
+        )
+    }
 
-    if (!anyWithP) return <Typography>No distributions for {date}.</Typography>
+    const goToPreviousSnapshot = () => {
+        setActive((index) => Math.max(0, index - 1))
+    }
 
-    const goPrev = () => { setPrevActive(active); setActive(a => Math.max(0, a - 1)) }
-    const goNext = () => { setPrevActive(active); setActive(a => Math.min(total - 1, a + 1)) }
-
-    const current = reversedEntries[active]
+    const goToNextSnapshot = () => {
+        setActive((index) => Math.min(totalSnapshots - 1, index + 1))
+    }
 
     return (
-        <Box sx={evaluationRootSx}>
-            <Typography variant="h4" sx={evaluationTitleSx} gutterBottom>
-                Temperature Evaluation Log
-            </Typography>
-        <Box sx={evaluationBodySx}>
-            <Box sx={evaluationTabsColumnSx}>
-                <IconButton onClick={goPrev} disabled={active === 0} size="small">
-                    <KeyboardArrowUpIcon />
-                </IconButton>
-                <Box
-                    ref={tabsContainerRef}
-                    sx={evaluationTabsScrollerSx}
-                >
-                    <Tabs
-                        orientation="vertical"
-                        variant="standard"
-                        value={active}
-                        onChange={(_, i) => {
-                            setPrevActive(active)
-                            setActive(i)
-                        }}
-                        sx={evaluationTabsSx}
+        <Paper sx={styles.shellPaper}>
+            <Box sx={styles.headerRow}>
+                <Box>
+                    <Typography
+                        sx={{ mb: 0.2, fontSize: { xs: 'clamp(1.4rem, 8.3vw, 2rem)', sm: undefined } }}
+                        variant='h5'
                     >
-                        {reversedEntries.map(e => (
-                            <Tab key={e.id} label={formatTime(e.id)} disableRipple />
-                        ))}
-                    </Tabs>
+                        Open-Meteo Temperature Evaluation Log
+                    </Typography>
+                    <Typography color='text.secondary' variant='body2'>
+                        Updated (UTC): {latestEvaluationUpdatedUtc}
+                    </Typography>
+                    <Typography color='text.secondary' variant='caption'>
+                        Built from Open-Meteo GFS forecast snapshots. Includes a synthetic
+                        scenario (+1.2°F shift) to compare stability of bucket probabilities.
+                    </Typography>
                 </Box>
-                <IconButton onClick={goNext} disabled={active === total - 1} size="small">
-                    <KeyboardArrowDownIcon />
-                </IconButton>
             </Box>
 
-            <Box sx={evaluationDetailsSx}>
-                <Box sx={evaluationMetaRowSx}>
-                <Box sx={evaluationMetaContentSx}>
-                    <Typography variant="body2">DateInQuestion:</Typography>
-                    <Typography variant="h6">{current!.dateInQuestion}</Typography>
-                    <Typography variant="body2">Location:</Typography>
-                    <Typography variant="h6">{current!.location}</Typography>
-                </Box>
-                </Box>
-                <TableContainer component={Paper}>
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell sx={rangeHeaderCellSx}>Range (°C)</TableCell>
-                                {basedArr.map(it => (
-                                    <TableCell key={it.evaluator}>{it.evaluator}</TableCell>
-                                ))}
-                                <TableCell>overall</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {buckets.map((b, bi) => (
-                                <TableRow key={b.key}>
-                                    <TableCell sx={rangeValueCellSx}>
-                                        <Tooltip title={b.labelC} arrow placement="right">
-                                            <span>{b.labelF}</span>
-                                        </Tooltip>
-                                    </TableCell>
-                                    {basedArr.map((item, ej) => {
-                                        const p = item.p?.[b.key]
-                                        let display: string | number = "–"
+            <Box sx={styles.contentRow}>
+                <Box sx={styles.tabsRail}>
+                    <IconButton
+                        aria-label='Previous evaluation snapshot'
+                        disabled={activeIndex === 0}
+                        onClick={goToPreviousSnapshot}
+                        size='small'
+                    >
+                        {isVerticalTabs ? <KeyboardArrowUpIcon /> : <KeyboardArrowLeftIcon />}
+                    </IconButton>
 
-                                        if (
-                                            item.evaluator === "forecast" ||
-                                            item.evaluator === "temperature prediction model"
-                                        ) {
-                                            display = `${Math.round((p ?? 0) * 100)}%`
-                                        } else if (item.evaluator === "maxTempReached" && typeof p === "number") {
-                                            const fixed = p.toFixed(1)
-                                            display = fixed.endsWith(".0")
-                                                ? fixed.slice(0, -2)
-                                                : fixed
-                                        } else if (item.evaluator === "certain" && p != null) {
-                                            display = p
-                                        }
-                                        const changed = diffMatrix[bi][ej]
-                                        return (
-                                            <TableCell
-                                                key={ej}
-                                                sx={changedValueCellSx(changed)}
-                                            >
-                                                {display}
-                                            </TableCell>
-                                        )
-                                    })}
-                                    <TableCell>
-                                        {current!.p && current!.p[b.key] != null
-                                            ? `${Math.round(current!.p[b.key]! * 100)}%`
-                                            : "–"}
+                    <Box ref={tabsContainerRef} sx={styles.tabsViewport}>
+                        <Tabs
+                            onChange={(_, nextIndex) => {
+                                setActive(nextIndex)
+                            }}
+                            orientation={isVerticalTabs ? 'vertical' : 'horizontal'}
+                            scrollButtons={false}
+                            sx={styles.tabs}
+                            value={activeIndex}
+                            variant={isVerticalTabs ? 'standard' : 'scrollable'}
+                        >
+                            {reversedEntries.map((entry) => (
+                                <Tab
+                                    disableRipple
+                                    key={entry.id}
+                                    label={formatSnapshotTime(entry.id)}
+                                />
+                            ))}
+                        </Tabs>
+                    </Box>
+
+                    <IconButton
+                        aria-label='Next evaluation snapshot'
+                        disabled={activeIndex === totalSnapshots - 1}
+                        onClick={goToNextSnapshot}
+                        size='small'
+                    >
+                        {isVerticalTabs ? <KeyboardArrowDownIcon /> : <KeyboardArrowRightIcon />}
+                    </IconButton>
+                </Box>
+
+                <Box sx={styles.contentPanel}>
+                    <Box sx={styles.metaRow}>
+                        <Box sx={styles.metaItem}>
+                            <Typography color='text.secondary' variant='body2'>
+                                Date in question:
+                            </Typography>
+                            <Typography variant='subtitle1'>
+                                {currentSnapshot.dateInQuestion}
+                            </Typography>
+                        </Box>
+                        <Box sx={styles.metaItem}>
+                            <Typography color='text.secondary' variant='body2'>
+                                Location:
+                            </Typography>
+                            <Typography variant='subtitle1'>
+                                {currentSnapshot.location}
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    <TableContainer component={Paper} sx={styles.tableContainer}>
+                        <Table
+                            aria-label='Open-Meteo temperature evaluation table'
+                            size='small'
+                            sx={styles.table}
+                        >
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell component='th' scope='col' sx={{ minWidth: 100 }}>
+                                        Range (°C)
+                                    </TableCell>
+                                    {basedOnItems.map((item) => (
+                                        <TableCell component='th' key={item.evaluator} scope='col'>
+                                            {item.evaluator}
+                                        </TableCell>
+                                    ))}
+                                    <TableCell component='th' scope='col'>
+                                        overall
                                     </TableCell>
                                 </TableRow>
-                            ))}
-                            <TableRow>
-                                <TableCell sx={dataLabelCellSx}>Data</TableCell>
-                                 {basedArr.map((it, ej) => (
-                                   <TableCell
-                                     key={it.evaluator}
-                                     sx={changedDataCellSx(dataChanged[ej])}
-                                   >
-                                     {it.data || "–"}
-                                   </TableCell>
-                                 ))}
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+
+                            <TableBody>
+                                {buckets.map((bucket, bucketIndex) => (
+                                    <TableRow key={bucket.key}>
+                                        <TableCell component='th' scope='row' sx={styles.bucketCell}>
+                                            <Tooltip arrow placement='right' title={bucket.labelF}>
+                                                <span>{bucket.labelC}</span>
+                                            </Tooltip>
+                                        </TableCell>
+
+                                        {basedOnItems.map((item, itemIndex) => {
+                                            const probability = item.p[bucket.key]
+                                            const hasChanged =
+                                                probabilityChangedByBucket[bucketIndex][itemIndex]
+
+                                            return (
+                                                <TableCell
+                                                    key={item.evaluator}
+                                                    sx={{
+                                                        backgroundColor: hasChanged
+                                                            ? CHANGED_CELL_BACKGROUND
+                                                            : 'inherit',
+                                                    }}
+                                                >
+                                                    {formatBucketValue(item, probability)}
+                                                </TableCell>
+                                            )
+                                        })}
+
+                                        <TableCell>
+                                            {currentSnapshot.p[bucket.key] != null
+                                                ? `${Math.round(currentSnapshot.p[bucket.key] * 100)}%`
+                                                : '–'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+
+                                <TableRow>
+                                    <TableCell component='th' scope='row' sx={{ fontWeight: 600 }}>
+                                        Data
+                                    </TableCell>
+
+                                    {basedOnItems.map((item, itemIndex) => (
+                                        <TableCell
+                                            key={item.evaluator}
+                                            sx={{
+                                                backgroundColor: dataChangedByEvaluator[itemIndex]
+                                                    ? CHANGED_CELL_BACKGROUND
+                                                    : undefined,
+                                            }}
+                                        >
+                                            <Tooltip arrow placement='top' title={item.data || '–'}>
+                                                <Box component='span' sx={styles.dataPreview}>
+                                                    {item.data || '–'}
+                                                </Box>
+                                            </Tooltip>
+                                        </TableCell>
+                                    ))}
+
+                                    <TableCell>–</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Box>
             </Box>
-        </Box>
-        </Box>
+        </Paper>
     )
 }
 
+function getTemperatureEvaluationTableStyles(isVerticalTabs: boolean) {
+    return {
+        loadingPaper: {
+            mb: 2.2,
+            p: 3,
+            display: 'flex',
+            justifyContent: 'center',
+        },
+        statusPaper: {
+            mb: 2.2,
+            p: { xs: 1.4, md: 1.7 },
+        },
+        compactStatusPaper: {
+            mb: 2.2,
+            p: 2,
+        },
+        errorStateRow: {
+            display: 'flex',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 1.2,
+            flexDirection: { xs: 'column', sm: 'row' },
+        },
+        errorTextBlock: {
+            minWidth: 0,
+        },
+        errorTitle: {
+            mb: 0.25,
+            color: 'error.main',
+            fontWeight: 700,
+        },
+        shellPaper: {
+            mb: 2.2,
+            p: { xs: 1.4, md: 2 },
+        },
+        headerRow: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 0.6,
+            mb: 1.1,
+        },
+        contentRow: {
+            mb: 1,
+            display: 'flex',
+            alignItems: 'flex-start',
+            flexDirection: { xs: 'column', lg: 'row' },
+            gap: { xs: 0.9, lg: 1.2 },
+        },
+        contentPanel: {
+            flex: 1,
+            minWidth: 0,
+            width: '100%',
+        },
+        tabsRail: {
+            display: 'flex',
+            flexDirection: isVerticalTabs ? 'column' : 'row',
+            alignItems: 'center',
+            px: isVerticalTabs ? 0.2 : 0,
+            gap: isVerticalTabs ? 0 : 0.6,
+            flexShrink: 0,
+            width: { xs: '100%', lg: 'auto' },
+            minWidth: 0,
+            alignSelf: { lg: 'flex-start' },
+        },
+        tabsViewport: {
+            maxHeight: isVerticalTabs ? 'clamp(160px, 34vh, 320px)' : 'none',
+            minWidth: isVerticalTabs ? 110 : 0,
+            width: isVerticalTabs ? 'auto' : 'auto',
+            flex: isVerticalTabs ? 'none' : 1,
+            overflowX: isVerticalTabs ? 'hidden' : 'auto',
+            overflowY: isVerticalTabs ? 'auto' : 'hidden',
+            ...scrollbarSx,
+        },
+        tabs: {
+            '& .MuiTabs-indicator': isVerticalTabs
+                ? { left: 0, width: 3, background: 'primary.main' }
+                : { height: 3, borderRadius: 999, background: 'primary.main' },
+            '& .MuiTab-root': {
+                px: isVerticalTabs ? 1.5 : 1.2,
+                minWidth: isVerticalTabs ? 0 : SNAPSHOT_TAB_WIDTH,
+                textTransform: 'none',
+                fontSize: { xs: 12.4, sm: 12.7, md: 13 },
+            },
+            '& .MuiTab-root.Mui-selected': {
+                fontWeight: 600,
+                color: 'primary.main',
+            },
+        },
+        metaRow: {
+            display: 'flex',
+            justifyContent: { xs: 'flex-start', lg: 'flex-end' },
+            alignItems: 'center',
+            columnGap: { xs: 1, lg: 2 },
+            rowGap: 0.45,
+            flexWrap: 'wrap',
+            mb: 0.9,
+        },
+        metaItem: {
+            display: 'inline-flex',
+            alignItems: 'baseline',
+            gap: 0.8,
+            whiteSpace: 'nowrap',
+            maxWidth: '100%',
+        },
+        tableContainer: {
+            border: `1px solid ${TABLE_BORDER_COLOR}`,
+            borderRadius: 2.2,
+            boxShadow: 'none',
+            backgroundImage: 'none',
+            maxWidth: '100%',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            boxSizing: 'border-box',
+            px: 0,
+            pt: 0,
+            pb: 0,
+        },
+        table: {
+            width: '100%',
+            minWidth: { xs: 560, sm: 620, md: 680 },
+            '& .MuiTableCell-root': {
+                py: { xs: 0.78, sm: 0.86, md: 1.1 },
+                px: { xs: 0.82, sm: 1.02, md: 1.12 },
+                fontSize: { xs: 12.2, sm: 12.7, md: 13.5 },
+                lineHeight: 1.45,
+                whiteSpace: 'nowrap',
+            },
+            '& .MuiTableCell-head': {
+                fontWeight: 700,
+                fontSize: { xs: 12.2, sm: 12.7, md: 13.5 },
+                whiteSpace: 'nowrap',
+                lineHeight: 1.3,
+                px: { xs: 0.92, sm: 1.12, md: 1.24 },
+            },
+            '& .MuiTableCell-root:first-of-type': {
+                pl: { xs: 1.35, sm: 1.75, md: 2.15 },
+            },
+            '& .MuiTableCell-root:last-of-type': {
+                pr: { xs: 1.35, sm: 1.75, md: 2.15 },
+            },
+        },
+        bucketCell: {
+            minWidth: 115,
+            userSelect: 'none',
+        },
+        dataPreview: {
+            display: 'inline-block',
+            maxWidth: { xs: '18ch', sm: '22ch', md: '26ch' },
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            verticalAlign: 'bottom',
+        },
+    }
+}
+
 export default TemperatureEvaluationTable
-
-const changedCellBackground = "rgba(255,235,59,0.3)"
-
-const evaluationEmptyStateSx = {
-    m: 2,
-    textAlign: "center",
-} as const
-
-const evaluationRootSx = {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    gap: 1,
-    maxWidth: 1200,
-} as const
-
-const evaluationTitleSx = {
-    margin: 2,
-} as const
-
-const evaluationBodySx = {
-    mb: 1,
-    display: "flex",
-} as const
-
-const evaluationTabsColumnSx = {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    px: 1,
-} as const
-
-const evaluationTabsScrollerSx = {
-    maxHeight: "570px",
-    minWidth: 110,
-    ...scrollbarSx,
-} as const
-
-const evaluationTabsSx = {
-    "& .MuiTabs-indicator": { left: 0, width: 3, background: "primary.main" },
-    "& .MuiTab-root": { px: 1.5, textTransform: "none", fontSize: 13 },
-    "& .MuiTab-root.Mui-selected": { fontWeight: 600, color: "primary.main" },
-} as const
-
-const evaluationDetailsSx = {
-    width: "100%",
-} as const
-
-const evaluationMetaRowSx = {
-    display: "flex",
-    justifyContent: "flex-end",
-    width: "100%",
-    height: "40px",
-    marginBottom: "10px",
-} as const
-
-const evaluationMetaContentSx = {
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 3,
-    a: "5px",
-} as const
-
-const rangeHeaderCellSx = {
-    minWidth: 100,
-} as const
-
-const rangeValueCellSx = {
-    minWidth: 115,
-    userSelect: "none",
-} as const
-
-const changedValueCellSx = (changed: boolean) => ({
-    backgroundColor: changed ? changedCellBackground : "inherit",
-})
-
-const dataLabelCellSx = {
-    fontWeight: 600,
-} as const
-
-const changedDataCellSx = (changed: boolean) => ({
-    backgroundColor: changed ? changedCellBackground : undefined,
-})
