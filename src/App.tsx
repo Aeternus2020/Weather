@@ -45,7 +45,6 @@ function getRouteState(): RouteState {
 function AppShell() {
     const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
     const [routeState, setRouteState] = useState<RouteState>(getRouteState)
-    const currentPath = routeState.pathname
 
     const [mode, setMode] = useState<WeatherThemeMode>(() => {
         const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -120,10 +119,8 @@ function AppShell() {
 
                 <Box sx={pageContentSx}>
                     <AppHeader
-                        currentPath={currentPath}
                         isDemoOpen={isDemoOpen}
                         mode={mode}
-                        onNavigateToHref={navigateToHref}
                         onOpenDemo={openDemo}
                         onToggleTheme={() => setMode(prev => (prev === 'dark' ? 'light' : 'dark'))}
                     />

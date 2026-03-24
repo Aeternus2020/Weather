@@ -12,27 +12,17 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded'
 import { WeatherThemeMode } from '../theme'
-import { shouldHandleClientNavigation } from '../ui/shouldHandleClientNavigation'
-
-const publicPageLinks = [
-    { href: '/london/', label: 'London' },
-    { href: '/ny/', label: 'New York' },
-] as const
 
 type AppHeaderProps = {
-    currentPath: string
     isDemoOpen: boolean
     mode: WeatherThemeMode
-    onNavigateToHref: (href: string) => void
     onOpenDemo: () => void
     onToggleTheme: () => void
 }
 
 export default function AppHeader({
-    currentPath,
     isDemoOpen,
     mode,
-    onNavigateToHref,
     onOpenDemo,
     onToggleTheme,
 }: AppHeaderProps) {
@@ -43,21 +33,7 @@ export default function AppHeader({
         >
             <Box sx={headerTopRowSx}>
                 <Box sx={headerCopySx}>
-                    <Typography
-                        component="a"
-                        href="/"
-                        onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
-                            if (!shouldHandleClientNavigation(event)) {
-                                return
-                            }
-
-                            event.preventDefault()
-                            onNavigateToHref('/')
-                        }}
-                        variant="h4"
-                        color="primary.main"
-                        sx={headerTitleLinkSx}
-                    >
+                    <Typography variant="h4" color="primary.main" sx={headerTitleSx}>
                         Forecast Atlas
                     </Typography>
                     <Typography
@@ -67,33 +43,6 @@ export default function AppHeader({
                     >
                         Observation streams, forecast runs, and evaluation snapshots by location.
                     </Typography>
-                    <Box
-                        component="nav"
-                        aria-label="Public pages"
-                        sx={headerNavSx}
-                    >
-                        {publicPageLinks.map((link) => (
-                            <Button
-                                key={link.href}
-                                component="a"
-                                href={link.href}
-                                onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
-                                    if (!shouldHandleClientNavigation(event)) {
-                                        return
-                                    }
-
-                                    event.preventDefault()
-                                    onNavigateToHref(link.href)
-                                }}
-                                aria-current={currentPath === link.href ? 'page' : undefined}
-                                size="small"
-                                variant="text"
-                                sx={headerNavLinkSx}
-                            >
-                                {link.label}
-                            </Button>
-                        ))}
-                    </Box>
                 </Box>
 
                 <Box sx={headerActionsSx}>
@@ -162,28 +111,9 @@ const headerTitleSx = {
     letterSpacing: '-0.02em',
 } as const
 
-const headerTitleLinkSx = {
-    ...headerTitleSx,
-    display: 'inline-block',
-    textDecoration: 'none',
-} as const
-
 const headerSubtitleSx = {
     mt: 0.45,
     maxWidth: { xs: '34ch', sm: '52ch' },
-} as const
-
-const headerNavSx = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 0.25,
-    mt: 0.8,
-    ml: -0.6,
-} as const
-
-const headerNavLinkSx = {
-    minWidth: 0,
-    px: 0.9,
 } as const
 
 const headerActionsSx = {
