@@ -7,6 +7,7 @@ import {
     Typography,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
+import { visuallyHidden } from "@mui/utils"
 
 import ObservationControls from "./controls/WeatherObservationsControl"
 import { ForecastSlider } from "./controls/ForecastSlider"
@@ -49,6 +50,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
         forecastBySource,
         getColor,
         latestForecastIds,
+        latestForecastsVisible,
         latestForecastUpdatedUtc,
         latestObservationsUpdatedUtc,
         onlyNoaa,
@@ -76,15 +78,23 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
 
     if (isLoading) {
         return (
-            <Paper sx={styles.centeredStatePaper}>
-                <CircularProgress />
+            <Paper
+                aria-busy="true"
+                aria-live="polite"
+                role="status"
+                sx={styles.centeredStatePaper}
+            >
+                <CircularProgress aria-hidden="true" />
+                <Box component="span" sx={visuallyHidden}>
+                    Loading weather observations.
+                </Box>
             </Paper>
         )
     }
 
     if (isObservationsError) {
         return (
-            <Paper sx={styles.statePaper}>
+            <Paper role="alert" sx={styles.statePaper}>
                 <Box sx={styles.stateContent}>
                     <Box sx={{ minWidth: 0 }}>
                         <Typography variant="body1" color="error.main" fontWeight={700} sx={{ mb: 0.25 }}>
@@ -109,28 +119,52 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
 
     if (!entries.length) {
         return (
-            <Paper sx={styles.centeredStatePaper}>
-                <Typography sx={{ textAlign: 'center' }}>
-                    <strong>Weather Observations: </strong>No data for
-                    <strong> {location}</strong> on
-                    <strong> {date}</strong>.
-                </Typography>
+            <Paper aria-live="polite" role="status" sx={styles.centeredStatePaper}>
+                <Box sx={{ textAlign: 'center' }}>
+                    <Typography>
+                        <strong>Weather Observations: </strong>No data for
+                        <strong> {location}</strong> on
+                        <strong> {date}</strong>.
+                    </Typography>
+                    <Typography color='text.secondary' sx={{ mt: 0.75 }} variant='body2'>
+                        Try another date or switch location.
+                    </Typography>
+                </Box>
             </Paper>
         )
     }
 
     return (
-        <Paper data-forecast-boundary sx={styles.shellPaper}>
+        <Paper
+            component="section"
+            aria-labelledby="weather-observations-title"
+            data-forecast-boundary
+            sx={styles.shellPaper}
+        >
             <Box sx={{ mb: 1.1 }}>
-                <Typography variant="h5" sx={{ mb: 0.2 }}>
+                <Typography
+                    id="weather-observations-title"
+                    component="h2"
+                    variant="h5"
+                    sx={{ mb: 0.2 }}
+                >
                     Weather Observations
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     Updated (UTC): observations: {latestObservationsUpdatedUtc} • forecasts: {latestForecastUpdatedUtc}
                 </Typography>
+                <Typography
+                    id="weather-observations-chart-summary"
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.55, maxWidth: 780 }}
+                >
+                    Interactive line chart for {location} on {date}. Use the source filters and forecast controls
+                    to show or hide providers, then hover or tap points to read exact values and timestamps.
+                </Typography>
             </Box>
             {isForecastError && (
-                <Box sx={styles.forecastWarning}>
+                <Box role="alert" sx={styles.forecastWarning}>
                     <Box sx={{ minWidth: 0 }}>
                         <Typography
                             variant="body2"
@@ -168,6 +202,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
                     forecastBySource={forecastBySource}
                     visibleIds={visibleLines}
                     latestIds={latestForecastIds}
+                    latestVisible={latestForecastsVisible}
                     toggleForecast={toggleLine}
                     toggleLatestForecasts={toggleLatestForecasts}
                     toggleAllForecasts={toggleAllForecasts}
@@ -178,6 +213,7 @@ const WeatherObservationsGraph: React.FC<Props> = ({ date, location, distributio
             </Box>
             <Box sx={{ position: 'relative' }}>
                 <WeatherObservationsChart
+                    ariaDescriptionId="weather-observations-chart-summary"
                     chartData={chartData}
                     date={date}
                     distributions={distributions}

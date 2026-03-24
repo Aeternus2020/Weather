@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from 'react'
+import React, { FC, useEffect, useId, useRef, useState } from 'react'
 import CheckIcon from '@mui/icons-material/Check'
 import TuneIcon from '@mui/icons-material/Tune'
 import {
@@ -24,6 +24,7 @@ interface ForecastDriverProps {
     forecastBySource: Record<string, WeatherForecast[]>
     visibleIds: string[]
     latestIds: string[]
+    latestVisible: boolean
     toggleForecast: (id: string) => void
     toggleAllForSource: (source: string, checked: boolean) => void
     toggleLatestForecasts: (checked: boolean) => void
@@ -79,6 +80,7 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
     forecastBySource,
     visibleIds,
     latestIds,
+    latestVisible,
     toggleForecast,
     toggleAllForSource,
     toggleLatestForecasts,
@@ -90,15 +92,15 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
     const [panelMaxHeight, setPanelMaxHeight] = useState(FORECAST_PANEL_DEFAULT_MAX_HEIGHT)
     const [boundaryEl, setBoundaryEl] = useState<HTMLElement | null>(null)
     const anchorRef = useRef<HTMLDivElement | null>(null)
+    const forecastSourcesPanelId = useId()
     const styles = getForecastSliderStyles(panelMaxHeight)
 
     const allForecastIds = Object.values(forecastBySource).flatMap((entries) =>
         entries.map(makeForecastId),
     )
     const hasForecasts = allForecastIds.length > 0
-    const latestChecked = latestIds.length > 0 && latestIds.every((id) => visibleIds.includes(id))
     const allForecastsChecked = allForecastIds.length > 0 && allForecastIds.every((id) => visibleIds.includes(id))
-    const latestButtonLabel = latestChecked ? 'Hide latest forecasts' : 'Show latest forecasts'
+    const latestButtonLabel = latestVisible ? 'Hide latest forecasts' : 'Show latest forecasts'
     const allButtonLabel = allForecastsChecked ? 'Hide all forecasts' : 'Show all forecasts'
 
     useEffect(() => {
@@ -137,6 +139,8 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                 <Box sx={styles.controlsRow}>
                     <Button
                         aria-label="Open forecast sources"
+                        aria-controls={open && hasForecasts ? forecastSourcesPanelId : undefined}
+                        aria-expanded={open && hasForecasts}
                         variant="outlined"
                         size="small"
                         onClick={() => setOpen((prev) => !prev)}
@@ -149,9 +153,9 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                     <Box sx={styles.actionButtonsWrap}>
                         <Button
                             aria-label={latestButtonLabel}
-                            variant={latestChecked ? 'contained' : 'outlined'}
+                            variant={latestVisible ? 'contained' : 'outlined'}
                             size="small"
-                            onClick={() => toggleLatestForecasts(!latestChecked)}
+                            onClick={() => toggleLatestForecasts(!latestVisible)}
                             disabled={!hasForecasts}
                             sx={styles.bulkButton}
                         >
@@ -199,7 +203,13 @@ export const ForecastSlider: FC<ForecastDriverProps> = ({
                 >
                     {({ TransitionProps }) => (
                         <Fade {...TransitionProps} timeout={180}>
-                            <Paper elevation={4} sx={styles.panel}>
+                            <Paper
+                                aria-label="Forecast sources"
+                                component="section"
+                                elevation={4}
+                                id={forecastSourcesPanelId}
+                                sx={styles.panel}
+                            >
                                 {Object.entries(forecastBySource).map(([src, entries]) => {
                                     const ids = entries.map(makeForecastId)
                                     const selectedCount = ids.filter((id) => visibleIds.includes(id)).length

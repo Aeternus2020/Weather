@@ -41,6 +41,7 @@ type ClientPointEvent = {
 }
 
 interface WeatherObservationsChartProps {
+    ariaDescriptionId?: string
     chartData: Serie[]
     date: string
     distributions: Array<Record<string, number>>
@@ -119,7 +120,12 @@ function getClientPointFromEvent(event: ClientPointEvent): { x: number; y: numbe
     return null
 }
 
+function stopChartEventPropagation(event: React.SyntheticEvent) {
+    event.stopPropagation()
+}
+
 const WeatherObservationsChart: React.FC<WeatherObservationsChartProps> = ({
+    ariaDescriptionId,
     chartData,
     date,
     distributions,
@@ -306,7 +312,10 @@ const WeatherObservationsChart: React.FC<WeatherObservationsChartProps> = ({
                 </Typography>
             </Box>
             <Box
+                aria-describedby={ariaDescriptionId}
+                aria-label={`Temperature comparison chart for ${location} on ${date}`}
                 ref={chartAreaRef}
+                role="group"
                 sx={styles.chartArea}
                 onMouseMove={handleChartMouseMove}
                 onMouseLeave={() => setHoverMousePos(null)}
@@ -475,11 +484,19 @@ const WeatherObservationsChart: React.FC<WeatherObservationsChartProps> = ({
                     }}
                 />
                 {isTouchDevice && lockedTooltip && (
-                    <Box sx={styles.getLockedTooltip(lockedTooltip)}>
+                    <Box
+                        sx={styles.getLockedTooltip(lockedTooltip)}
+                        onPointerDown={stopChartEventPropagation}
+                        onClick={stopChartEventPropagation}
+                    >
                         <IconButton
                             size="small"
                             aria-label="Close point details"
-                            onClick={() => setLockedTooltip(null)}
+                            onPointerDown={stopChartEventPropagation}
+                            onClick={(event) => {
+                                stopChartEventPropagation(event)
+                                setLockedTooltip(null)
+                            }}
                             sx={styles.lockedTooltipCloseButton}
                         >
                             <CloseRoundedIcon sx={{ fontSize: 16 }} />

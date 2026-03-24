@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Serie } from '@nivo/line'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -12,7 +12,6 @@ import type {
 dayjs.extend(utc)
 
 const NOAA_SOURCE = 'tgftp.nws.noaa.gov'
-const OPEN_METEO_SOURCE_MATCH = 'open-meteo'
 const SERIES_COLOR_PALETTE = [
     '#0072B2',
     '#E69F00',
@@ -90,7 +89,9 @@ export function useWeatherObservationsGraphModel({
     unit,
 }: UseWeatherObservationsGraphModelArgs) {
     const [visibleLines, setVisibleLines] = useState<string[]>([])
+    const [latestForecastsVisible, setLatestForecastsVisible] = useState(true)
     const [selectedSourcesByLocation, setSelectedSourcesByLocation] = useState<Record<string, string[]>>({})
+    const seededScopeKeyRef = useRef<string | null>(null)
 
     const dataByLine = useMemo(() => {
         const lines = new Map<string, LineEntry>()
@@ -216,6 +217,14 @@ export function useWeatherObservationsGraphModel({
             .filter((entry): entry is WeatherForecast => entry !== null)
             .map(makeForecastKey)
     }, [forecastBySource])
+    const currentScopeKey = `${location}|${date}`
+    const latestForecastsVisibleForScope = seededScopeKeyRef.current !== currentScopeKey
+        ? true
+        : latestForecastsVisible
+
+    useEffect(() => {
+        setLatestForecastsVisible(true)
+    }, [currentScopeKey])
 
     useEffect(() => {
         if (!allIds.length) {
@@ -229,18 +238,19 @@ export function useWeatherObservationsGraphModel({
                 return Boolean(line && !line.descriptor.isForecast && line.data.length > 0)
             })
 
-            const previousForecastIds = prevVisibleLines.filter((id) => id.startsWith('F|'))
-            const defaultForecastId = latestForecastIds.find((id) =>
-                (dataByLine.get(id)?.descriptor.source ?? '').includes(OPEN_METEO_SOURCE_MATCH)
-            )
-            const keepAllLatestForecasts = latestForecastIds.every((id) =>
-                previousForecastIds.includes(id)
-            )
-            const nextForecastIds = keepAllLatestForecasts && latestForecastIds.length
-                ? latestForecastIds
-                : defaultForecastId
-                    ? [defaultForecastId]
-                    : []
+            const currentForecastIds = prevVisibleLines.filter((id) => {
+                const line = dataByLine.get(id)
+
+                return Boolean(
+                    line
+                    && line.descriptor.isForecast
+                    && line.data.length > 0
+                )
+            })
+            const additionalForecastIds = currentForecastIds.filter((id) => !latestForecastIds.includes(id))
+            const nextForecastIds = latestForecastsVisibleForScope
+                ? [...additionalForecastIds, ...latestForecastIds]
+                : currentForecastIds
             const nextVisibleLines = [...new Set([...observationIds, ...nextForecastIds])]
 
             if (
@@ -252,7 +262,7 @@ export function useWeatherObservationsGraphModel({
 
             return nextVisibleLines
         })
-    }, [allIds, dataByLine, latestForecastIds])
+    }, [allIds, dataByLine, latestForecastIds, latestForecastsVisibleForScope])
 
     const { observationLineIds, forecastLineIds, sources } = useMemo(() => {
         const observationLineIds: string[] = []
@@ -359,10 +369,27 @@ export function useWeatherObservationsGraphModel({
     })
 
     const toggleLatestForecasts = (checked: boolean) => {
+        setLatestForecastsVisible(checked)
         setVisibleLines((prevVisibleLines) => {
             if (checked) {
-                const observationIds = prevVisibleLines.filter((id) => !latestForecastIds.includes(id))
-                return [...observationIds, ...latestForecastIds]
+                const observationIds = prevVisibleLines.filter((id) => {
+                    const line = dataByLine.get(id)
+
+                    return Boolean(line && !line.descriptor.isForecast)
+                })
+
+                const additionalForecastIds = prevVisibleLines.filter((id) => {
+                    const line = dataByLine.get(id)
+
+                    return Boolean(
+                        line
+                        && line.descriptor.isForecast
+                        && line.data.length > 0
+                        && !latestForecastIds.includes(id),
+                    )
+                })
+
+                return [...observationIds, ...additionalForecastIds, ...latestForecastIds]
             }
 
             return prevVisibleLines.filter((id) => !latestForecastIds.includes(id))
@@ -370,6 +397,12 @@ export function useWeatherObservationsGraphModel({
     }
 
     const toggleLine = (id: string) => {
+        const isHidingLatestForecast = latestForecastIds.includes(id) && visibleLines.includes(id)
+
+        if (isHidingLatestForecast) {
+            setLatestForecastsVisible(false)
+        }
+
         setVisibleLines((prevVisibleLines) =>
             prevVisibleLines.includes(id)
                 ? prevVisibleLines.filter((value) => value !== id)
@@ -379,6 +412,10 @@ export function useWeatherObservationsGraphModel({
 
     const toggleAllForSource = (source: string, checked: boolean) => {
         const sourceLineIds = (forecastBySource[source] ?? []).map(makeForecastKey)
+
+        if (!checked && sourceLineIds.some((id) => latestForecastIds.includes(id))) {
+            setLatestForecastsVisible(false)
+        }
 
         setVisibleLines((prevVisibleLines) =>
             checked
@@ -418,6 +455,10 @@ export function useWeatherObservationsGraphModel({
     }
 
     const toggleAllForecasts = (checked: boolean) => {
+        if (!checked) {
+            setLatestForecastsVisible(false)
+        }
+
         setVisibleLines((prevVisibleLines) =>
             checked
                 ? Array.from(new Set([...prevVisibleLines, ...forecastLineIds]))
@@ -449,24 +490,7 @@ export function useWeatherObservationsGraphModel({
     }
 
     useEffect(() => {
-        if (!location) {
-            return
-        }
-
-        setVisibleLines([])
-        setSelectedSourcesByLocation((prev) => {
-            const currentSources = prev[location]
-
-            if (currentSources && currentSources.length > 0) {
-                return prev
-            }
-
-            return setLocationSources(prev, location, [NOAA_SOURCE])
-        })
-    }, [location])
-
-    useEffect(() => {
-        if (!location || !allIds.length || visibleLines.length) {
+        if (!location || !allIds.length) {
             return
         }
 
@@ -487,19 +511,19 @@ export function useWeatherObservationsGraphModel({
             return setLocationSources(prev, location, [NOAA_SOURCE])
         })
 
-        const latestOpenMeteoForecast = forecastEntries
-            .filter((entry) => entry.source.includes(OPEN_METEO_SOURCE_MATCH))
-            .sort((left, right) => right.timestamp.seconds - left.timestamp.seconds)[0]
-        const latestOpenMeteoId = latestOpenMeteoForecast
-            ? makeForecastKey(latestOpenMeteoForecast)
-            : undefined
+        const isNewScope = seededScopeKeyRef.current !== currentScopeKey
+
+        if (!isNewScope && visibleLines.length) {
+            return
+        }
 
         setVisibleLines(
-            latestOpenMeteoId
-                ? [...initialObservationIds, latestOpenMeteoId]
+            latestForecastIds.length
+                ? [...initialObservationIds, ...latestForecastIds]
                 : initialObservationIds
         )
-    }, [allIds, dataByLine, forecastEntries, location, observationLineIds, selectedSourcesByLocation, visibleLines])
+        seededScopeKeyRef.current = currentScopeKey
+    }, [allIds, currentScopeKey, dataByLine, latestForecastIds, location, observationLineIds, selectedSourcesByLocation, visibleLines])
 
     return {
         chartData,
@@ -507,6 +531,7 @@ export function useWeatherObservationsGraphModel({
         forecastBySource,
         getColor,
         latestForecastIds,
+        latestForecastsVisible: latestForecastsVisibleForScope,
         latestForecastUpdatedUtc,
         latestObservationsUpdatedUtc,
         onlyNoaa,

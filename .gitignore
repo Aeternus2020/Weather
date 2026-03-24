@@ -9,6 +9,7 @@ yarn-error.log*
 .pnp
 .pnp.js
 .env
+.env.production
 .env.local
 .env.*.local
 .DS_Store

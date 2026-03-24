@@ -22,6 +22,7 @@ import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft'
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import { alpha, useTheme } from '@mui/material/styles'
+import { visuallyHidden } from '@mui/utils'
 import type { BasedOnItem } from './typesTemperatureEvaluation'
 import { useTemperatureEvaluationQuery } from './useTemperatureEvaluationQuery'
 import { convertBoundsToC } from '../observations/chart/useFahrenheitLinesLayer'
@@ -39,12 +40,6 @@ interface Props {
     date: string
     location: string
     setDistributions: (arr: Array<Record<string, number>>) => void
-}
-
-type Bucket = {
-    key: string
-    labelF: string
-    labelC: string
 }
 
 function formatSnapshotTime(snapshotId: string): string {
@@ -109,6 +104,42 @@ function formatBucketValue(
     return '–'
 }
 
+function getChangedCellAriaLabel(value: string | number, changed: boolean) {
+    const label = String(value)
+
+    return changed
+        ? `${label}. Changed since the previous snapshot.`
+        : label
+}
+
+function renderChangeAwareValue(
+    value: string | number,
+    changed: boolean,
+) {
+    return (
+        <Box
+            component='span'
+            sx={changed ? changedValueWrapSx : unchangedValueWrapSx}
+        >
+            {changed && (
+                <Box
+                    aria-hidden='true'
+                    component='span'
+                    sx={changedMarkerSx}
+                >
+                    Δ
+                </Box>
+            )}
+            <Box
+                aria-label={getChangedCellAriaLabel(value, changed)}
+                component='span'
+            >
+                {value}
+            </Box>
+        </Box>
+    )
+}
+
 const TemperatureEvaluationTable = ({
     date,
     location,
@@ -138,6 +169,9 @@ const TemperatureEvaluationTable = ({
     const latestEvaluationUpdatedUtc = reversedEntries[0]
         ? formatSnapshotUpdatedAt(reversedEntries[0].timestamp.seconds)
         : '–'
+    const comparisonSnapshotLabel = previousSnapshot
+        ? formatSnapshotTime(previousSnapshot.id)
+        : 'No previous snapshot'
     const errorInfo = getQueryErrorInfo(error)
 
     useEffect(() => {
@@ -263,15 +297,23 @@ const TemperatureEvaluationTable = ({
 
     if (isLoading) {
         return (
-            <Paper sx={styles.loadingPaper}>
-                <CircularProgress />
+            <Paper
+                aria-busy='true'
+                aria-live='polite'
+                role='status'
+                sx={styles.loadingPaper}
+            >
+                <CircularProgress aria-hidden='true' />
+                <Box component='span' sx={visuallyHidden}>
+                    Loading temperature evaluation.
+                </Box>
             </Paper>
         )
     }
 
     if (isError) {
         return (
-            <Paper sx={styles.statusPaper}>
+            <Paper role='alert' sx={styles.statusPaper}>
                 <Box sx={styles.errorStateRow}>
                     <Box sx={styles.errorTextBlock}>
                         <Typography sx={styles.errorTitle}>
@@ -296,21 +338,31 @@ const TemperatureEvaluationTable = ({
 
     if (!reversedEntries.length) {
         return (
-            <Paper sx={styles.compactStatusPaper}>
-                <Typography sx={{ m: 2, textAlign: 'center' }}>
-                    <strong>Open-Meteo Evaluation: </strong>
-                    No data for
-                    <strong> {location}</strong> on
-                    <strong> {date}</strong>.
-                </Typography>
+            <Paper aria-live='polite' role='status' sx={styles.compactStatusPaper}>
+                <Box sx={{ m: 2, textAlign: 'center' }}>
+                    <Typography>
+                        <strong>Open-Meteo Evaluation: </strong>
+                        No data for
+                        <strong> {location}</strong> on
+                        <strong> {date}</strong>.
+                    </Typography>
+                    <Typography color='text.secondary' sx={{ mt: 0.75 }} variant='body2'>
+                        Try another date or switch location.
+                    </Typography>
+                </Box>
             </Paper>
         )
     }
 
     if (!firstEvaluatorWithProbabilities || !currentSnapshot) {
         return (
-            <Paper sx={styles.compactStatusPaper}>
-                <Typography>No Open-Meteo distributions for {date}.</Typography>
+            <Paper aria-live='polite' role='status' sx={styles.compactStatusPaper}>
+                <Box sx={{ textAlign: 'center' }}>
+                    <Typography>No Open-Meteo distributions for {date}.</Typography>
+                    <Typography color='text.secondary' sx={{ mt: 0.75 }} variant='body2'>
+                        Try another date or switch location.
+                    </Typography>
+                </Box>
             </Paper>
         )
     }
@@ -324,10 +376,16 @@ const TemperatureEvaluationTable = ({
     }
 
     return (
-        <Paper sx={styles.shellPaper}>
+        <Paper
+            component='section'
+            aria-labelledby='temperature-evaluation-title'
+            sx={styles.shellPaper}
+        >
             <Box sx={styles.headerRow}>
                 <Box>
                     <Typography
+                        id='temperature-evaluation-title'
+                        component='h2'
                         sx={{ mb: 0.2, fontSize: { xs: 'clamp(1.4rem, 8.3vw, 2rem)', sm: undefined } }}
                         variant='h5'
                     >
@@ -405,9 +463,27 @@ const TemperatureEvaluationTable = ({
                         </Box>
                     </Box>
 
+                    <Box sx={styles.comparisonRow}>
+                        <Typography color='text.secondary' variant='body2'>
+                            Changes vs previous snapshot:
+                        </Typography>
+                        <Typography sx={styles.comparisonValue} variant='subtitle2'>
+                            {comparisonSnapshotLabel}
+                        </Typography>
+                    </Box>
+                    <Typography
+                        id='temperature-evaluation-change-note'
+                        color='text.secondary'
+                        variant='caption'
+                        sx={styles.changeNote}
+                    >
+                        Cells marked with Δ changed since the previous snapshot.
+                    </Typography>
+
                     <TableContainer component={Paper} sx={styles.tableContainer}>
                         <Table
                             aria-label='Open-Meteo temperature evaluation table'
+                            aria-describedby='temperature-evaluation-change-note'
                             size='small'
                             sx={styles.table}
                         >
@@ -432,7 +508,9 @@ const TemperatureEvaluationTable = ({
                                     <TableRow key={bucket.key}>
                                         <TableCell component='th' scope='row' sx={styles.bucketCell}>
                                             <Tooltip arrow placement='right' title={bucket.labelF}>
-                                                <span>{bucket.labelC}</span>
+                                                <span aria-label={`${bucket.labelC}, ${bucket.labelF}`}>
+                                                    {bucket.labelC}
+                                                </span>
                                             </Tooltip>
                                         </TableCell>
 
@@ -450,15 +528,21 @@ const TemperatureEvaluationTable = ({
                                                             : 'inherit',
                                                     }}
                                                 >
-                                                    {formatBucketValue(item, probability)}
+                                                    {renderChangeAwareValue(
+                                                        formatBucketValue(item, probability),
+                                                        hasChanged,
+                                                    )}
                                                 </TableCell>
                                             )
                                         })}
 
                                         <TableCell>
-                                            {currentSnapshot.p[bucket.key] != null
-                                                ? `${Math.round(currentSnapshot.p[bucket.key] * 100)}%`
-                                                : '–'}
+                                            {renderChangeAwareValue(
+                                                currentSnapshot.p[bucket.key] != null
+                                                    ? `${Math.round(currentSnapshot.p[bucket.key] * 100)}%`
+                                                    : '–',
+                                                false,
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -478,8 +562,12 @@ const TemperatureEvaluationTable = ({
                                             }}
                                         >
                                             <Tooltip arrow placement='top' title={item.data || '–'}>
-                                                <Box component='span' sx={styles.dataPreview}>
-                                                    {item.data || '–'}
+                                                <Box
+                                                    aria-label={getChangedCellAriaLabel(item.data || '–', dataChangedByEvaluator[itemIndex])}
+                                                    component='span'
+                                                    sx={styles.dataPreview}
+                                                >
+                                                    {renderChangeAwareValue(item.data || '–', dataChangedByEvaluator[itemIndex])}
                                                 </Box>
                                             </Tooltip>
                                         </TableCell>
@@ -602,6 +690,20 @@ function getTemperatureEvaluationTableStyles(isVerticalTabs: boolean) {
             whiteSpace: 'nowrap',
             maxWidth: '100%',
         },
+        comparisonRow: {
+            mb: 0.9,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            flexWrap: 'wrap',
+        },
+        changeNote: {
+            display: 'block',
+            mb: 0.9,
+        },
+        comparisonValue: {
+            fontWeight: 600,
+        },
         tableContainer: {
             border: `1px solid ${TABLE_BORDER_COLOR}`,
             borderRadius: 2.2,
@@ -655,3 +757,20 @@ function getTemperatureEvaluationTableStyles(isVerticalTabs: boolean) {
 }
 
 export default TemperatureEvaluationTable
+
+const unchangedValueWrapSx = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.45,
+} as const
+
+const changedValueWrapSx = {
+    ...unchangedValueWrapSx,
+    fontWeight: 600,
+} as const
+
+const changedMarkerSx = {
+    color: 'text.secondary',
+    fontSize: '0.78em',
+    lineHeight: 1,
+} as const

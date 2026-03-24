@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://forecast-atlas.web.app/</loc>
+  </url>
+  <url>
+    <loc>https://forecast-atlas.web.app/london/</loc>
+  </url>
+  <url>
+    <loc>https://forecast-atlas.web.app/ny/</loc>
+  </url>
+</urlset>
