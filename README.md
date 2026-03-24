@@ -14,7 +14,7 @@ evaluation log for two locations (`London`, `NY`) in UTC.
 - Frontend: React 19 + Vite + TypeScript + MUI + Nivo.
 - Data store: Cloud Firestore.
 - Backend: Firebase Cloud Functions v2 (Node 20), schedule-triggered.
-- Hosting: Firebase Hosting (SPA rewrite to `index.html`).
+- Hosting: Firebase Hosting with static multi-page entry points and a dedicated `404.html`.
 
 Data flow:
 1. Scheduled Functions pull weather data from provider APIs.
@@ -76,7 +76,13 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 VITE_FIREBASE_MEASUREMENT_ID=...
 VITE_FIRESTORE_DB=(default)
+VITE_GOOGLE_SITE_VERIFICATION=...
 ```
+
+If you do not provide a `.env`, the frontend falls back to the live `forecast-atlas`
+Firebase web config included in [`src/firebase.ts`](./src/firebase.ts). That is
+convenient for demo use, but it means local frontend reads the shared demo/live
+project by default.
 
 Run local frontend:
 
@@ -153,4 +159,5 @@ firebase functions:log
 ```
 
 ## License
-Private/internal unless explicitly published.
+No open-source license is included in this repository.
+Unless a `LICENSE` file is added, treat the code as all rights reserved.

@@ -10,8 +10,8 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
         palette: {
             mode,
             primary: {
-                main: isDark ? '#76B6FF' : '#2A7DE1',
-                light: isDark ? '#9DCBFF' : '#6AA4EB',
+                main: isDark ? '#76B6FF' : '#1F72D6',
+                light: isDark ? '#9DCBFF' : '#5E9BE8',
                 dark: isDark ? '#3A8CE8' : '#1657A3',
             },
             secondary: {
@@ -39,7 +39,7 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
             },
         },
         shape: {
-            borderRadius: 14,
+            borderRadius: 8,
         },
         typography: {
             fontFamily: '"Manrope", "IBM Plex Sans", sans-serif',
@@ -107,7 +107,7 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
             MuiPaper: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 16,
+                        borderRadius: 12,
                         border: `1px solid ${isDark ? '#355578' : '#C7D7EC'}`,
                         boxShadow: isDark
                             ? '0 12px 34px rgba(2, 6, 12, 0.52)'
@@ -122,7 +122,7 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
             MuiButton: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 10,
+                        borderRadius: 8,
                         paddingInline: 14,
                     },
                     sizeSmall: {
@@ -154,7 +154,7 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
             MuiToggleButton: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 8,
+                        borderRadius: 6,
                         fontWeight: 700,
                     },
                 },
@@ -162,7 +162,7 @@ export function createWeatherTheme(mode: WeatherThemeMode) {
             MuiAccordion: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 12,
+                        borderRadius: 10,
                         border: `1px solid ${alpha(isDark ? '#77A8DD' : '#7A94BA', isDark ? 0.22 : 0.25)}`,
                         boxShadow: 'none',
                         ':before': {

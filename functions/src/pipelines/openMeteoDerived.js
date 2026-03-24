@@ -1,6 +1,6 @@
 const logger = require("firebase-functions/logger")
 const { BUCKETS_F, LOCATIONS, CACHE_TTL_MINUTES, INGESTION_CONCURRENCY } = require("../config")
-const { round } = require("../utils/common")
+const { round, toDateOnlyUtc } = require("../utils/common")
 const { createFailure, createRunResult } = require("../utils/runResult")
 const { shouldFetchByCache, writeForecast, writeTemperatureEvaluation, markCacheSuccess } = require("../repository")
 const { fetchOpenMeteoForecast } = require("../providers/shared/openMeteo")
@@ -79,6 +79,18 @@ function averageDistributions(firstDistribution, secondDistribution) {
   return average
 }
 
+function filterTemperaturesForUtcDay(times, temperatures, runTime) {
+  const runDate = toDateOnlyUtc(runTime)
+
+  return times.reduce((selectedTemperatures, time, index) => {
+    if (toDateOnlyUtc(new Date(time)) === runDate) {
+      selectedTemperatures.push(temperatures[index] ?? null)
+    }
+
+    return selectedTemperatures
+  }, [])
+}
+
 async function ingestOpenMeteoCoreForecastAndEvaluation(runTime) {
   const result = createRunResult()
 
@@ -93,7 +105,7 @@ async function ingestOpenMeteoCoreForecastAndEvaluation(runTime) {
       })
       if (!canFetch) return
 
-      const { forecast, temps } = await fetchOpenMeteoForecast(location)
+      const { forecast, times, temps } = await fetchOpenMeteoForecast(location)
       if (!forecast.length) return
 
       await writeForecast({
@@ -103,7 +115,8 @@ async function ingestOpenMeteoCoreForecastAndEvaluation(runTime) {
         forecast,
       })
 
-      const tempsF = temps.map((t) => (t == null ? null : cToF(t)))
+      const selectedDayTemps = filterTemperaturesForUtcDay(times, temps, runTime)
+      const tempsF = selectedDayTemps.map((t) => (t == null ? null : cToF(t)))
       const finiteTempsF = tempsF.filter((v) => Number.isFinite(v))
       const dist = buildDistributionFromTemps(tempsF)
       const maxF = finiteTempsF.length ? Math.max(...finiteTempsF) : NaN
@@ -165,5 +178,6 @@ async function ingestOpenMeteoCoreForecastAndEvaluation(runTime) {
 }
 
 module.exports = {
+  filterTemperaturesForUtcDay,
   ingestOpenMeteoCoreForecastAndEvaluation,
 }

@@ -1,11 +1,12 @@
 {
-  "name": "bot",
+  "name": "forecast-atlas",
   "version": "1.0.0",
-  "description": "",
+  "description": "Forecast Atlas weather intelligence dashboard",
   "main": "dist/index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -34,5 +35,6 @@
     "typescript": "^5.5.3",
     "vite": "^6.2.6"
   },
+  "license": "UNLICENSED",
   "private": true
 }

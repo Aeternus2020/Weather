@@ -53,15 +53,17 @@ export function useWeatherForecastsQuery(
         queryKey: ['weather-forecasts', date, location],
         queryFn: async () => {
             try {
-                const dayStart = Timestamp.fromDate(new Date(`${date}T00:00:00Z`))
-                const dayEnd   = Timestamp.fromDate(new Date(`${date}T23:59:59Z`))
+                const dayStartDate = new Date(`${date}T00:00:00Z`)
+                const nextDayStartDate = new Date(dayStartDate.getTime() + 24 * 60 * 60 * 1000)
+                const dayStart = Timestamp.fromDate(dayStartDate)
+                const nextDayStart = Timestamp.fromDate(nextDayStartDate)
 
                 const collRef = collection(db, 'weather-forecasts')
                 const q = query(
                     collRef,
                     where('location',  '==', location),
                     where('timestamp', '>=', dayStart),
-                    where('timestamp', '<',  dayEnd),
+                    where('timestamp', '<', nextDayStart),
                     orderBy('timestamp', 'asc'),
                 )
 

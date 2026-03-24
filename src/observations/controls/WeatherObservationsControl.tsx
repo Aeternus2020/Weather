@@ -76,7 +76,11 @@ const ObservationControls: FC<ControlsProps> = ({
                         Sources ({selectedSources.length} selected)
                     </Typography>
                 </AccordionSummary>
-                <AccordionDetails sx={styles.sourcesDetails}>
+                <AccordionDetails
+                    aria-labelledby="obs-controls-header"
+                    id="obs-controls-content"
+                    sx={styles.sourcesDetails}
+                >
                     <Box sx={styles.sourcesGrid}>
                         {sortedSources.map((src) => (
                             <FormControlLabel
@@ -148,10 +152,9 @@ function getSourceLabelSx(baseColor: string) {
                 color: visibleColor,
                 fontSize: { xs: 13, sm: 13.5 },
                 lineHeight: 1.25,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: { xs: '13ch', sm: '16ch', md: '22ch' },
+                whiteSpace: 'normal',
+                overflowWrap: 'anywhere',
+                maxWidth: '100%',
             },
         }
     }
@@ -178,9 +181,9 @@ function getObservationControlStyles() {
             px: { xs: 1.1, sm: 1.5 },
             fontSize: { xs: '0.74rem', sm: '0.8125rem' },
             justifyContent: 'center',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
+            textAlign: 'center',
+            lineHeight: 1.25,
         },
         sourcesAccordion: {
             borderColor: 'divider',
